@@ -191,10 +191,10 @@ install-cert-manager: ## Install cert-manager on the cluster
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
 	@echo "Waiting for cert-manager webhook to be fully ready..."
-	@until $(KUBECTL) get validatingwebhookconfigurations cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q .; do \
+	@timeout 120 bash -c 'until $(KUBECTL) get validatingwebhookconfigurations cert-manager-webhook -o jsonpath="{.webhooks[0].clientConfig.caBundle}" | grep -q .; do \
 		echo "Waiting for CA bundle injection..."; \
 		sleep 2; \
-	done
+	done'
 	@echo "cert-manager is ready"
 
 .PHONY: uninstall-cert-manager
