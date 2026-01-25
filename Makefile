@@ -179,6 +179,9 @@ SHIPWRIGHT_BUILD_URL ?= https://github.com/shipwright-io/build/releases/download
 .PHONY: prereq
 prereq: install-tekton install-shipwright ## Install prerequisites for image-builder-operator
 
+.PHONY: uninstall-prereq
+uninstall-prereq: uninstall-shipwright uninstall-tekton ## Uninstall prerequisites for image-builder-operator
+
 .PHONY: install-tekton
 install-tekton: ## Install Tekton Pipelines on the cluster
 	$(KUBECTL) apply -f $(TEKTON_PIPELINES_URL)
@@ -191,7 +194,7 @@ uninstall-tekton: ## Uninstall Tekton Pipelines from the cluster
 
 .PHONY: install-shipwright
 install-shipwright: install-tekton ## Install Shipwright Build on the cluster
-	$(KUBECTL) apply -f $(SHIPWRIGHT_BUILD_URL)
+	$(KUBECTL) apply --server-side -f $(SHIPWRIGHT_BUILD_URL)
 	$(KUBECTL) apply -f hack/shipwright/certs.yaml
 	@for crd in $$($(KUBECTL) get crd -oname | grep shipwright.io); do \
 		$(KUBECTL) annotate $$crd cert-manager.io/inject-ca-from=shipwright-build/shipwright-build-webhook-cert --overwrite; \
