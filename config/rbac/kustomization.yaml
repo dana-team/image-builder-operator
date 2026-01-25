@@ -25,9 +25,6 @@ resources:
 - imagebuildpolicy_admin_role.yaml
 - imagebuildpolicy_editor_role.yaml
 - imagebuildpolicy_viewer_role.yaml
-- imagebuilderpolicy_admin_role.yaml
-- imagebuilderpolicy_editor_role.yaml
-- imagebuilderpolicy_viewer_role.yaml
 - imagebuild_admin_role.yaml
 - imagebuild_editor_role.yaml
 - imagebuild_viewer_role.yaml
