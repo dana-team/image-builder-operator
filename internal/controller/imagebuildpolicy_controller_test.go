@@ -30,7 +30,7 @@ import (
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 )
 
-var _ = Describe("ImageBuilderPolicy Controller", func() {
+var _ = Describe("ImageBuildPolicy Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("ImageBuilderPolicy Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		imagebuilderpolicy := &buildv1alpha1.ImageBuilderPolicy{}
+		imagebuildpolicy := &buildv1alpha1.ImageBuildPolicy{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind ImageBuilderPolicy")
-			err := k8sClient.Get(ctx, typeNamespacedName, imagebuilderpolicy)
+			By("creating the custom resource for the Kind ImageBuildPolicy")
+			err := k8sClient.Get(ctx, typeNamespacedName, imagebuildpolicy)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &buildv1alpha1.ImageBuilderPolicy{
+				resource := &buildv1alpha1.ImageBuildPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("ImageBuilderPolicy Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &buildv1alpha1.ImageBuilderPolicy{}
+			resource := &buildv1alpha1.ImageBuildPolicy{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance ImageBuilderPolicy")
+			By("Cleanup the specific resource instance ImageBuildPolicy")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &ImageBuilderPolicyReconciler{
+			controllerReconciler := &ImageBuildPolicyReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

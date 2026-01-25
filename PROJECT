@@ -23,7 +23,7 @@ resources:
   controller: true
   domain: dana.io
   group: build
-  kind: ImageBuilderPolicy
+  kind: ImageBuildPolicy
   path: github.com/dana-team/image-builder-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

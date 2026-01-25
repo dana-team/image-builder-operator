@@ -4,6 +4,7 @@
 resources:
 - bases/build.dana.io_imagebuilds.yaml
 - bases/build.dana.io_imagebuilderpolicies.yaml
+- bases/build.dana.io_imagebuildpolicies.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

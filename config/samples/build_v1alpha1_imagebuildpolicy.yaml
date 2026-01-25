@@ -1,0 +1,9 @@
+apiVersion: build.dana.io/v1alpha1
+kind: ImageBuildPolicy
+metadata:
+  labels:
+    app.kubernetes.io/name: image-builder-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: imagebuildpolicy-sample
+spec:
+  # TODO(user): Add fields here

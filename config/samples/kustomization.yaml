@@ -2,4 +2,5 @@
 resources:
 - build_v1alpha1_imagebuild.yaml
 - build_v1alpha1_imagebuilderpolicy.yaml
+- build_v1alpha1_imagebuildpolicy.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
