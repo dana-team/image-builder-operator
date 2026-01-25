@@ -179,7 +179,7 @@ CERT_MANAGER_VERSION ?= v1.16.2
 CERT_MANAGER_URL ?= https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
 
 .PHONY: prereq
-prereq: install-cert-manager install-tekton install-shipwright ## Install prerequisites for image-builder-operator
+prereq: install-shipwright ## Install prerequisites for image-builder-operator
 
 .PHONY: uninstall-prereq
 uninstall-prereq: uninstall-shipwright uninstall-tekton uninstall-cert-manager ## Uninstall prerequisites for image-builder-operator
@@ -190,6 +190,12 @@ install-cert-manager: ## Install cert-manager on the cluster
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager --timeout=5m
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
+	@echo "Waiting for cert-manager webhook to be fully ready..."
+	@until $(KUBECTL) get validatingwebhookconfigurations cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q .; do \
+		echo "Waiting for CA bundle injection..."; \
+		sleep 2; \
+	done
+	@echo "cert-manager is ready"
 
 .PHONY: uninstall-cert-manager
 uninstall-cert-manager: ## Uninstall cert-manager from the cluster
@@ -206,7 +212,7 @@ uninstall-tekton: ## Uninstall Tekton Pipelines from the cluster
 	$(KUBECTL) delete -f $(TEKTON_PIPELINES_URL) --ignore-not-found=true
 
 .PHONY: install-shipwright
-install-shipwright: install-tekton ## Install Shipwright Build on the cluster
+install-shipwright: install-cert-manager install-tekton ## Install Shipwright Build on the cluster (requires cert-manager and Tekton)
 	$(KUBECTL) apply --server-side -f $(SHIPWRIGHT_BUILD_URL)
 	$(KUBECTL) apply -f hack/shipwright/certs.yaml
 	@for crd in $$($(KUBECTL) get crd -oname | grep shipwright.io); do \
