@@ -175,18 +175,31 @@ TEKTON_PIPELINES_VERSION ?= v0.68.0
 TEKTON_PIPELINES_URL ?= https://storage.googleapis.com/tekton-releases/pipeline/previous/$(TEKTON_PIPELINES_VERSION)/release.yaml
 SHIPWRIGHT_BUILD_VERSION ?= v0.17.0
 SHIPWRIGHT_BUILD_URL ?= https://github.com/shipwright-io/build/releases/download/$(SHIPWRIGHT_BUILD_VERSION)/release.yaml
+CERT_MANAGER_VERSION ?= v1.16.2
+CERT_MANAGER_URL ?= https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
 
 .PHONY: prereq
-prereq: install-tekton install-shipwright ## Install prerequisites for image-builder-operator
+prereq: install-cert-manager install-tekton install-shipwright ## Install prerequisites for image-builder-operator
 
 .PHONY: uninstall-prereq
-uninstall-prereq: uninstall-shipwright uninstall-tekton ## Uninstall prerequisites for image-builder-operator
+uninstall-prereq: uninstall-shipwright uninstall-tekton uninstall-cert-manager ## Uninstall prerequisites for image-builder-operator
+
+.PHONY: install-cert-manager
+install-cert-manager: ## Install cert-manager on the cluster
+	$(KUBECTL) apply -f $(CERT_MANAGER_URL)
+	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager --timeout=5m
+	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
+	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
+
+.PHONY: uninstall-cert-manager
+uninstall-cert-manager: ## Uninstall cert-manager from the cluster
+	$(KUBECTL) delete -f $(CERT_MANAGER_URL) --ignore-not-found=true
 
 .PHONY: install-tekton
 install-tekton: ## Install Tekton Pipelines on the cluster
 	$(KUBECTL) apply -f $(TEKTON_PIPELINES_URL)
-	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-controller --timeout=10m
-	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-webhook --timeout=10m
+	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-controller --timeout=5m
+	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-webhook --timeout=5m
 
 .PHONY: uninstall-tekton
 uninstall-tekton: ## Uninstall Tekton Pipelines from the cluster
@@ -199,8 +212,8 @@ install-shipwright: install-tekton ## Install Shipwright Build on the cluster
 	@for crd in $$($(KUBECTL) get crd -oname | grep shipwright.io); do \
 		$(KUBECTL) annotate $$crd cert-manager.io/inject-ca-from=shipwright-build/shipwright-build-webhook-cert --overwrite; \
 	done
-	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-controller --timeout=10m
-	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-webhook --timeout=10m
+	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-controller --timeout=5m
+	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-webhook --timeout=5m
 	$(KUBECTL) apply -f hack/shipwright/strategies.yaml
 
 .PHONY: uninstall-shipwright
