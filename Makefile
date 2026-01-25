@@ -169,6 +169,43 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+##@ Prerequisites
+
+TEKTON_PIPELINES_VERSION ?= v0.68.0
+TEKTON_PIPELINES_URL ?= https://storage.googleapis.com/tekton-releases/pipeline/previous/$(TEKTON_PIPELINES_VERSION)/release.yaml
+SHIPWRIGHT_BUILD_VERSION ?= v0.17.0
+SHIPWRIGHT_BUILD_URL ?= https://github.com/shipwright-io/build/releases/download/$(SHIPWRIGHT_BUILD_VERSION)/release.yaml
+
+.PHONY: prereq
+prereq: install-tekton install-shipwright ## Install prerequisites for image-builder-operator
+
+.PHONY: install-tekton
+install-tekton: ## Install Tekton Pipelines on the cluster
+	$(KUBECTL) apply -f $(TEKTON_PIPELINES_URL)
+	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-controller --timeout=10m
+	$(KUBECTL) -n tekton-pipelines rollout status deployment/tekton-pipelines-webhook --timeout=10m
+
+.PHONY: uninstall-tekton
+uninstall-tekton: ## Uninstall Tekton Pipelines from the cluster
+	$(KUBECTL) delete -f $(TEKTON_PIPELINES_URL) --ignore-not-found=true
+
+.PHONY: install-shipwright
+install-shipwright: install-tekton ## Install Shipwright Build on the cluster
+	$(KUBECTL) apply -f $(SHIPWRIGHT_BUILD_URL)
+	$(KUBECTL) apply -f hack/shipwright/certs.yaml
+	@for crd in $$($(KUBECTL) get crd -oname | grep shipwright.io); do \
+		$(KUBECTL) annotate $$crd cert-manager.io/inject-ca-from=shipwright-build/shipwright-build-webhook-cert --overwrite; \
+	done
+	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-controller --timeout=10m
+	$(KUBECTL) -n shipwright-build rollout status deployment/shipwright-build-webhook --timeout=10m
+	$(KUBECTL) apply -f hack/shipwright/strategies.yaml
+
+.PHONY: uninstall-shipwright
+uninstall-shipwright: ## Uninstall Shipwright Build from the cluster
+	$(KUBECTL) delete -f hack/shipwright/strategies.yaml --ignore-not-found=true
+	$(KUBECTL) delete -f hack/shipwright/certs.yaml --ignore-not-found=true
+	$(KUBECTL) delete -f $(SHIPWRIGHT_BUILD_URL) --ignore-not-found=true
+
 ##@ Dependencies
 
 ## Location to install dependencies to
