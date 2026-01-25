@@ -187,14 +187,9 @@ uninstall-prereq: uninstall-shipwright uninstall-tekton uninstall-cert-manager #
 .PHONY: install-cert-manager
 install-cert-manager: ## Install cert-manager on the cluster
 	$(KUBECTL) apply -f $(CERT_MANAGER_URL)
-	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager --timeout=5m
-	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
+	@echo "Waiting for cert-manager cainjector..."
 	$(KUBECTL) -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
-	@echo "Waiting for cert-manager webhook to be fully ready..."
-	@timeout 120 bash -c 'until $(KUBECTL) get validatingwebhookconfigurations cert-manager-webhook -o jsonpath="{.webhooks[0].clientConfig.caBundle}" | grep -q .; do \
-		echo "Waiting for CA bundle injection..."; \
-		sleep 2; \
-	done'
+	@timeout 120 bash -c 'until $(KUBECTL) get validatingwebhookconfigurations cert-manager-webhook -o jsonpath="{.webhooks[0].clientConfig.caBundle}" 2>/dev/null | grep -q .; do sleep 2; done'
 	@echo "cert-manager is ready"
 
 .PHONY: uninstall-cert-manager
