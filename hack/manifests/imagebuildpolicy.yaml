@@ -1,0 +1,11 @@
+apiVersion: build.dana.io/v1alpha1
+kind: ImageBuildPolicy
+metadata:
+  name: image-build-policy
+spec:
+  clusterBuildStrategy:
+    buildFile:
+      present: "buildpacks-v3"
+      absent: "buildah-strategy-managed-push"
+  output:
+    defaultImageRepo: "example.com/default-repo"
