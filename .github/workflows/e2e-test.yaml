@@ -16,6 +16,7 @@ jobs:
     env:
       E2E_SKIP_CLEANUP: "true"
       E2E_GINKGO_PROCS: 8
+      KIND_CLUSTER: hub
       KIND_VERSION: v0.25.0
       K8S_VERSION: v1.30.4
       IMAGE_TAG: test-${{ github.sha }}
@@ -55,14 +56,14 @@ jobs:
       - name: Start kind cluster
         uses: container-tools/kind-action@v2
         with:
-          cluster_name: hub
+          cluster_name: ${{ env.KIND_CLUSTER }}
           version: ${{env.KIND_VERSION}}
           node_image: kindest/node:${{env.K8S_VERSION}}
           kubectl_version: ${{env.K8S_VERSION}}
           registry: true
 
       - name: Load image into kind cluster
-        run: kind load docker-image image-builder-operator:${IMAGE_TAG} --name hub
+        run: kind load docker-image image-builder-operator:${IMAGE_TAG} --name ${KIND_CLUSTER}
 
       - name: Setup prerequisites
         run: make prereq
