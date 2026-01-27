@@ -1,5 +1,4 @@
 apiVersion: v2
-# CI Note: Chart name must match repository name for release workflow auto-detection
 name: image-builder-operator
 description: A Helm chart for the Image Builder Operator
 type: application

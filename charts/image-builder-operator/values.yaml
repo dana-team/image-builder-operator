@@ -1,72 +1,32 @@
-# Default values for image-builder-operator.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
 controllerManager:
-  manager:
-    # -- Arguments passed to the controller manager container.
-    args:
-      - --metrics-bind-address=:8443
-      - --leader-elect
-
-    containerSecurityContext:
-      # -- Whether a process can gain more privileges than its parent process.
-      allowPrivilegeEscalation: false
-      # -- Linux capabilities to drop from the container for improved security.
-      capabilities:
-        drop:
-          - ALL
-
-    image:
-      # -- Controller manager container image repository.
-      repository: ghcr.io/dana-team/image-builder-operator
-      # -- Controller manager container image tag.
-      tag: ""
-      # -- Controller manager container image pull policy.
-      imagePullPolicy: IfNotPresent
-
-    resources:
-      limits:
-        # -- Maximum CPU limit for the controller manager container.
-        cpu: 500m
-        # -- Maximum memory limit for the controller manager container.
-        memory: 128Mi
-      requests:
-        # -- Minimum CPU request for the controller manager container.
-        cpu: 10m
-        # -- Minimum memory request for the controller manager container.
-        memory: 64Mi
-
-  podSecurityContext:
-    # -- Run controller manager pods as non-root user.
-    runAsNonRoot: true
+  image:
+    # -- Controller manager container image repository.
+    repository: ghcr.io/dana-team/image-builder-operator
+    # -- Controller manager container image tag.
+    tag: ""
+    # -- Controller manager container image pull policy.
+    imagePullPolicy: IfNotPresent
 
   # -- Number of replicas for the controller manager Deployment.
   replicas: 1
 
-  serviceAccount:
-    # -- Annotations to add to the service account used by the controller manager.
-    annotations: {}
-
-# -- Domain name of the Kubernetes cluster.
-kubernetesClusterDomain: cluster.local
-
-webhookService:
-  # -- List of ports exposed by the webhook service.
-  ports:
-    - port: 443
-      protocol: TCP
-      targetPort: 9443
-  # -- Type of Kubernetes Service to expose the webhook (ClusterIP, NodePort, LoadBalancer).
-  type: ClusterIP
+  # -- Resource requests/limits for the controller manager container.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
 
 # -- Configuration for ImageBuildPolicy CRD
 imageBuildPolicy:
   # -- Enable or disable creation of the ImageBuildPolicy resource by Helm.
   enabled: true
 
-  output:
-    # -- Default OCI image repo (no tag/digest) for build outputs.
+  # output:
+  #   # -- Default OCI image repo (no tag/digest) for build outputs.
+  #   defaultImageRepo: "registry.example.com/team/repo"
 
   clusterBuildStrategy:
     buildFile:

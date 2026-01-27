@@ -23,17 +23,16 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
         command:
         - /manager
         env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ quote .Values.kubernetesClusterDomain }}
         - name: ENABLE_ONCOMMIT_WEBHOOK
           value: {{ ternary "true" "false" .Values.onCommit.enabled | quote }}
-        image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
-          | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
+        image: {{ .Values.controllerManager.image.repository }}:{{ .Values.controllerManager.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.controllerManager.image.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -51,16 +50,12 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
-          }}
-        securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
-          | nindent 10 }}
+        resources:
+        {{- toYaml .Values.controllerManager.resources | nindent 10 }}
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
-      securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
-        8 }}
       serviceAccountName: {{ include "image-builder-operator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
