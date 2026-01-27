@@ -47,7 +47,7 @@ test: manifests generate fmt vet setup-envtest ## Run unit tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 ifdef E2E_GINKGO_PROCS
-GINKGO_E2E_PROCS_FLAG := --procs=$(E2E_GINKGO_PROCS)
+GINKGO_E2E_PROCS_FLAG := -p -procs=$(E2E_GINKGO_PROCS)
 endif
 
 KIND_CLUSTER ?= image-builder-operator-test-e2e
@@ -67,8 +67,8 @@ setup-test-e2e: ## Set up Kind cluster for e2e tests.
 	esac
 
 .PHONY: test-e2e
-test-e2e: setup-test-e2e manifests generate fmt vet ## Run e2e tests.
-	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v $(GINKGO_E2E_PROCS_FLAG)
+test-e2e: setup-test-e2e manifests generate fmt vet ginkgo ## Run e2e tests.
+	KIND_CLUSTER=$(KIND_CLUSTER) $(GINKGO) -v $(GINKGO_E2E_PROCS_FLAG) ./test/e2e/...
 ifndef E2E_SKIP_CLEANUP
 	$(MAKE) cleanup-test-e2e
 endif
@@ -216,12 +216,14 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GINKGO ?= $(LOCALBIN)/ginkgo
 
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 ENVTEST_K8S_VERSION = 1.31.0
 GOLANGCI_LINT_VERSION ?= v2.1.6
+GINKGO_VERSION ?= $(shell go list -m -f "{{ .Version }}" github.com/onsi/ginkgo/v2)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE)
@@ -250,6 +252,11 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT)
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: ginkgo
+ginkgo: $(GINKGO)
+$(GINKGO): $(LOCALBIN)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
 
 define go-install-tool
 @[ -f "$(1)-$(3)" ] || { \
