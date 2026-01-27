@@ -67,11 +67,11 @@ jobs:
       - name: Setup prerequisites
         run: make prereq
 
-      - name: Create ImageBuildPolicy
-        run: make create-imagebuildpolicy
-
       - name: Deploy controller to cluster
         run: make install deploy IMG=image-builder-operator:${IMAGE_TAG}
+
+      - name: Create ImageBuildPolicy
+        run: make create-imagebuildpolicy
 
       - name: Await controller to be ready
         uses: jupyterhub/action-k8s-await-workloads@v3
