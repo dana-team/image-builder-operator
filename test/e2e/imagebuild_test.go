@@ -2,8 +2,6 @@ package e2e_test
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"os"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -32,10 +30,10 @@ func newClient() client.Client {
 	return c
 }
 
-func newImageBuild(name, namespace, revision string) *buildv1alpha1.ImageBuild {
+func newImageBuild(namespace, revision string) *buildv1alpha1.ImageBuild {
 	return &buildv1alpha1.ImageBuild{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			GenerateName: "imagebuild-",
 			Namespace: namespace,
 		},
 		Spec: buildv1alpha1.ImageBuildSpec{
@@ -67,11 +65,11 @@ var _ = Describe("ImageBuild Shipwright integration", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		c = newClient()
-		namespace = fmt.Sprintf("test-e2e-%d", rand.Intn(100000))
 
 		By("Creating test namespace")
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-e2e-"}}
 		Expect(c.Create(ctx, ns)).To(Succeed())
+		namespace = ns.Name
 
 		By("Ensuring Shipwright is installed and reachable")
 		Expect(c.List(ctx, &shipwright.BuildRunList{}, client.InNamespace(namespace))).To(Succeed())
@@ -83,8 +81,10 @@ var _ = Describe("ImageBuild Shipwright integration", func() {
 		Expect(c.Get(ctx, types.NamespacedName{Name: absentStrategy}, &shipwright.ClusterBuildStrategy{})).To(Succeed())
 
 		By("Creating an ImageBuild")
-		imageBuildName = fmt.Sprintf("imagebuild-%d", rand.Intn(100000))
-		Expect(c.Create(ctx, newImageBuild(imageBuildName, namespace, "rev-1"))).To(Succeed())
+		ib := newImageBuild(namespace, "rev-1")
+		Expect(c.Create(ctx, ib)).To(Succeed())
+		Expect(ib.Name).NotTo(BeEmpty())
+		imageBuildName = ib.Name
 	})
 
 	AfterEach(func() {
