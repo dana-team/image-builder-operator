@@ -28,14 +28,6 @@ rules:
 - apiGroups:
   - build.dana.io
   resources:
-  - imagebuildpolicies
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - build.dana.io
-  resources:
   - imagebuilds
   verbs:
   - create
@@ -59,6 +51,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - build.dana.io
+  resources:
+  - imagebuildpolicies
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - shipwright.io
   resources:
