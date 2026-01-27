@@ -1,0 +1,17 @@
+{{- if .Values.imageBuildPolicy.enabled -}}
+apiVersion: build.dana.io/v1alpha1
+kind: ImageBuildPolicy
+metadata:
+  name: image-build-policy
+  labels:
+  {{- include "image-builder-operator.labels" . | nindent 4 }}
+spec:
+  clusterBuildStrategy:
+    buildFile:
+      present: {{ .Values.imageBuildPolicy.clusterBuildStrategy.buildFile.present }}
+      absent: {{ .Values.imageBuildPolicy.clusterBuildStrategy.buildFile.absent }}
+  {{- if .Values.imageBuildPolicy.output }}
+  output:
+    {{- toYaml .Values.imageBuildPolicy.output | nindent 4 }}
+  {{- end }}
+{{- end }}
