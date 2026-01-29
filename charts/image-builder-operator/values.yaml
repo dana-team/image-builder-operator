@@ -24,10 +24,6 @@ imageBuildPolicy:
   # -- Enable or disable creation of the ImageBuildPolicy resource by Helm.
   enabled: true
 
-  # output:
-  #   # -- Default OCI image repo (no tag/digest) for build outputs.
-  #   defaultImageRepo: "registry.example.com/team/repo"
-
   clusterBuildStrategy:
     buildFile:
       # -- Strategy name when the source indicates a file-based build.

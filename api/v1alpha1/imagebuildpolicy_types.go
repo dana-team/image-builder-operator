@@ -23,10 +23,6 @@ import (
 type ImageBuildPolicySpec struct {
 	// ClusterBuildStrategy holds platform defaults for selecting a build strategy.
 	ClusterBuildStrategy ImageBuildClusterStrategy `json:"clusterBuildStrategy"`
-
-	// +optional
-	// Output holds defaults for deriving the build output image.
-	Output *ImageBuildOutputPolicy `json:"output,omitempty"`
 }
 
 type ImageBuildClusterStrategy struct {
@@ -43,13 +39,6 @@ type ImageBuildFileStrategy struct {
 	// Absent is the strategy name to use when the source does not indicate a file-based build.
 	// +kubebuilder:validation:MinLength=1
 	Absent string `json:"absent"`
-}
-
-type ImageBuildOutputPolicy struct {
-	// +optional
-	// DefaultImageRepo is the default OCI image repo (no tag/digest) for build outputs.
-	// +kubebuilder:validation:MinLength=1
-	DefaultImageRepo string `json:"defaultImageRepo,omitempty"`
 }
 
 // ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy

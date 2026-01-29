@@ -10,8 +10,4 @@ spec:
     buildFile:
       present: {{ .Values.imageBuildPolicy.clusterBuildStrategy.buildFile.present }}
       absent: {{ .Values.imageBuildPolicy.clusterBuildStrategy.buildFile.absent }}
-  {{- if .Values.imageBuildPolicy.output }}
-  output:
-    {{- toYaml .Values.imageBuildPolicy.output | nindent 4 }}
-  {{- end }}
 {{- end }}

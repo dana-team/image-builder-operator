@@ -65,15 +65,6 @@ spec:
                 required:
                 - buildFile
                 type: object
-              output:
-                description: Output holds defaults for deriving the build output image.
-                properties:
-                  defaultImageRepo:
-                    description: DefaultImageRepo is the default OCI image repo (no
-                      tag/digest) for build outputs.
-                    minLength: 1
-                    type: string
-                type: object
             required:
             - clusterBuildStrategy
             type: object

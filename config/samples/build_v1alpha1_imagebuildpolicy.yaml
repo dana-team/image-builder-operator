@@ -7,5 +7,3 @@ spec:
     buildFile:
       present: buildpacks-v3
       absent: source-to-image
-  output:
-    defaultImageRepo: docker.io/myorg/images

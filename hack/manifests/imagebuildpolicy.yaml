@@ -7,5 +7,3 @@ spec:
     buildFile:
       present: "buildpacks-v3"
       absent: "buildah-strategy-managed-push"
-  output:
-    defaultImageRepo: "example.com/default-repo"
