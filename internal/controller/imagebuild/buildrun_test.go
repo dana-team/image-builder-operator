@@ -6,6 +6,7 @@ import (
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
+	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -153,6 +154,7 @@ func TestComputeLatestImage(t *testing.T) {
 func TestIsNewBuildRequired(t *testing.T) {
 	ctx := context.Background()
 	const testBuildRunName = "some-buildrun"
+	const testSecretName = "push-secret"
 
 	t.Run("no previous build => required", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
@@ -240,6 +242,81 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+
+		require.False(t, r.isNewBuildRequired(ctx, ib))
+	})
+
+	t.Run("secret now available => retry", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
+		ib.Status.LastBuildRunRef = testBuildRunName
+
+		failedBR := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testBuildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBR.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
+		})
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testSecretName,
+				Namespace: ib.Namespace,
+			},
+		}
+
+		r, _ := newReconciler(t, ib, failedBR, secret)
+		require.NoError(t, r.recordBuildSpec(ib))
+
+		require.True(t, r.isNewBuildRequired(ctx, ib))
+	})
+
+	t.Run("secret still missing => no retry", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
+		ib.Status.LastBuildRunRef = testBuildRunName
+
+		failedBR := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testBuildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBR.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
+		})
+
+		r, _ := newReconciler(t, ib, failedBR)
+		require.NoError(t, r.recordBuildSpec(ib))
+
+		require.False(t, r.isNewBuildRequired(ctx, ib))
+	})
+
+	t.Run("other error => no retry", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.LastBuildRunRef = testBuildRunName
+
+		failedBR := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testBuildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBR.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: "BuildRunTimeout",
+		})
+
+		r, _ := newReconciler(t, ib, failedBR)
+		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
