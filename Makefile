@@ -11,9 +11,6 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-.PHONY: all
-all: build
-
 ##@ General
 
 .PHONY: help
@@ -84,10 +81,6 @@ lint: golangci-lint ## Run golangci-lint.
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint with fixes.
 	$(GOLANGCI_LINT) run --fix
-
-.PHONY: lint-config
-lint-config: golangci-lint ## Verify golangci-lint config.
-	$(GOLANGCI_LINT) config verify
 
 ##@ Build
 
