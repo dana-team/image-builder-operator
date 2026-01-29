@@ -6,13 +6,19 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +30,9 @@ import (
 const (
 	imageBuildControllerName = "ImageBuildController"
 	ImageBuildPolicyName     = "image-build-policy"
+
+	indexPushSecret  = "pushSecret"
+	indexCloneSecret = "cloneSecret"
 )
 
 type ImageBuildReconciler struct {
@@ -44,12 +53,84 @@ type ImageBuildReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	ctx := context.Background()
+
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexPushSecret, func(obj client.Object) []string {
+		ib := obj.(*buildv1alpha1.ImageBuild)
+		if ib.Spec.Output.PushSecret != nil {
+			return []string{ib.Spec.Output.PushSecret.Name}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexCloneSecret, func(obj client.Object) []string {
+		ib := obj.(*buildv1alpha1.ImageBuild)
+		if ib.Spec.Source.Git.CloneSecret != nil {
+			return []string{ib.Spec.Source.Git.CloneSecret.Name}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
+		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.secretWatchPredicate())).
 		Named(imageBuildControllerName).
 		Complete(r)
+}
+
+// secretWatchPredicate filters Secret events to only trigger on Create events.
+func (r *ImageBuildReconciler) secretWatchPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return false
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return false
+		},
+	}
+}
+
+func (r *ImageBuildReconciler) mapSecretToImageBuilds() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var requests []reconcile.Request
+
+		for _, indexKey := range []string{indexPushSecret, indexCloneSecret} {
+			imageBuilds := &buildv1alpha1.ImageBuildList{}
+			if err := r.List(ctx, imageBuilds,
+				client.InNamespace(secret.Namespace),
+				client.MatchingFields{indexKey: secret.Name},
+			); err != nil {
+				log.FromContext(ctx).Error(err, "Failed to list ImageBuilds by secret index",
+					"Secret", secret.Name, "Index", indexKey)
+				continue
+			}
+
+			for _, ib := range imageBuilds.Items {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: client.ObjectKeyFromObject(&ib),
+				})
+			}
+		}
+
+		return requests
+	})
 }
 
 func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

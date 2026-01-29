@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,7 +17,7 @@ import (
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	distref "github.com/distribution/reference"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 )
 
 const annotationKeyLastBuildSpec = "build.dana.io/last-build-spec"
@@ -201,6 +202,8 @@ func (r *ImageBuildReconciler) ensureBuildRunOnCommit(ctx context.Context, ib *b
 }
 
 func (r *ImageBuildReconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+	logger := log.FromContext(ctx)
+
 	if ib.Status.LastBuildRunRef == "" {
 		return true
 	}
@@ -212,13 +215,24 @@ func (r *ImageBuildReconciler) isNewBuildRequired(ctx context.Context, ib *build
 
 	var lastInputs buildInputs
 	if err := json.Unmarshal([]byte(lastSpecJson), &lastInputs); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to unmarshal last build spec annotation", "ImageBuild", ib.Name)
+		logger.Error(err, "Failed to unmarshal last build spec annotation", "ImageBuild", ib.Name)
 		return true
 	}
 
-	return !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
+	if !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
 		!reflect.DeepEqual(ib.Spec.BuildFile, lastInputs.BuildFile) ||
-		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output)
+		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output) {
+		return true
+	}
+
+	if r.needsSecretRetry(ctx, ib) {
+		logger.Info("Triggering automatic retry: referenced secret is now available",
+			"ImageBuild", ib.Name,
+			"LastBuildRun", ib.Status.LastBuildRunRef)
+		return true
+	}
+
+	return false
 }
 
 func (r *ImageBuildReconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
@@ -239,4 +253,46 @@ func (r *ImageBuildReconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) err
 
 	ib.Annotations[annotationKeyLastBuildSpec] = string(specJson)
 	return nil
+}
+
+func (r *ImageBuildReconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+	logger := log.FromContext(ctx)
+
+	lastBR := &shipwright.BuildRun{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: ib.Namespace,
+		Name:      ib.Status.LastBuildRunRef,
+	}, lastBR); err != nil {
+		return false
+	}
+
+	succeededCond := lastBR.Status.GetCondition(shipwright.Succeeded)
+	if succeededCond == nil || succeededCond.GetStatus() != corev1.ConditionFalse {
+		return false
+	}
+
+	if succeededCond.GetReason() != shipwrightresources.ConditionBuildRegistrationFailed {
+		return false
+	}
+
+	var secretNames []string
+	if ib.Spec.Output.PushSecret != nil {
+		secretNames = append(secretNames, ib.Spec.Output.PushSecret.Name)
+	}
+	if ib.Spec.Source.Git.CloneSecret != nil {
+		secretNames = append(secretNames, ib.Spec.Source.Git.CloneSecret.Name)
+	}
+
+	for _, name := range secretNames {
+		secret := &corev1.Secret{}
+		if err := r.Get(ctx, client.ObjectKey{
+			Namespace: ib.Namespace,
+			Name:      name,
+		}, secret); err == nil {
+			logger.V(1).Info("Secret is now available, will retry build", "Secret", name)
+			return true
+		}
+	}
+
+	return false
 }
