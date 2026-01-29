@@ -5,11 +5,9 @@ Kubernetes operator for building container images from source code.
 ## Prerequisites
 
 - Kubernetes cluster (v1.28+)
-- [Tekton Pipelines](https://tekton.dev/)
-- [Shipwright Build](https://shipwright.io/)
-- [cert-manager](https://cert-manager.io/)
-
-> Tested versions are defined in the [Makefile](Makefile) (`TEKTON_PIPELINES_VERSION`, `SHIPWRIGHT_BUILD_VERSION`, `CERT_MANAGER_VERSION`).
+- [Tekton Pipelines](https://tekton.dev/) (v0.68.0)
+- [Shipwright Build](https://shipwright.io/) (v0.17.0)
+- [cert-manager](https://cert-manager.io/) (v1.16.2)
 
 ## Quick Start
 
