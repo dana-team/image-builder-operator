@@ -42,3 +42,12 @@ jobs:
         with:
           version: v2.7.2
           args: --timeout=2m
+
+      - name: Verify Helm CRDs are in sync
+        run: |
+          make sync-helm-crds
+          if ! git diff --exit-code charts/image-builder-operator/crds/; then
+            echo "ERROR: Helm CRDs are out of sync with generated CRDs."
+            echo "Run 'make sync-helm-crds' and commit the changes."
+            exit 1
+          fi
