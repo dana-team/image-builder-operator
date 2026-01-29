@@ -30,8 +30,6 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
 
       - name: Create install.yaml file
         run: make build-installer IMG=ghcr.io/${{ github.repository }}:${{ github.ref_name }}

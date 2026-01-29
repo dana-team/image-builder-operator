@@ -35,5 +35,3 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:main
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
