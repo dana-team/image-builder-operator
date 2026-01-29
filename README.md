@@ -9,7 +9,7 @@ Kubernetes operator for building container images from source code.
 - [Shipwright Build](https://shipwright.io/)
 - [cert-manager](https://cert-manager.io/)
 
-See [Makefile](Makefile) for tested versions.
+> Tested versions are defined in the [Makefile](Makefile) (`TEKTON_PIPELINES_VERSION`, `SHIPWRIGHT_BUILD_VERSION`, `CERT_MANAGER_VERSION`).
 
 ## Quick Start
 
