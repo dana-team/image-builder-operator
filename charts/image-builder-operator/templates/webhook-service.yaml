@@ -3,9 +3,6 @@ kind: Service
 metadata:
   name: {{ include "image-builder-operator.fullname" . }}-webhook-service
   labels:
-    app.kubernetes.io/component: webhook
-    app.kubernetes.io/created-by: image-builder-operator
-    app.kubernetes.io/part-of: image-builder-operator
   {{- include "image-builder-operator.labels" . | nindent 4 }}
 spec:
   ports:
@@ -14,5 +11,4 @@ spec:
       targetPort: 9443
   selector:
     control-plane: controller-manager
-    {{- include "image-builder-operator.selectorLabels" . | nindent 4 }}
   type: ClusterIP

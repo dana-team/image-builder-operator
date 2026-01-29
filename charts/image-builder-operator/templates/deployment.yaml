@@ -3,9 +3,6 @@ kind: Deployment
 metadata:
   name: {{ include "image-builder-operator.fullname" . }}-controller-manager
   labels:
-    app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: image-builder-operator
-    app.kubernetes.io/part-of: image-builder-operator
     control-plane: controller-manager
   {{- include "image-builder-operator.labels" . | nindent 4 }}
 spec:

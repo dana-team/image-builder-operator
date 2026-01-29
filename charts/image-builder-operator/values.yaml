@@ -2,7 +2,7 @@ controllerManager:
   image:
     # -- Controller manager container image repository.
     repository: ghcr.io/dana-team/image-builder-operator
-    # -- Controller manager container image tag.
+    # -- Controller manager container image tag. Defaults to .Chart.AppVersion if empty.
     tag: ""
     # -- Controller manager container image pull policy.
     imagePullPolicy: IfNotPresent

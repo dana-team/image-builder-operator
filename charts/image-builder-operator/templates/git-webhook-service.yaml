@@ -9,7 +9,6 @@ spec:
   type: ClusterIP
   selector:
     control-plane: controller-manager
-    {{- include "image-builder-operator.selectorLabels" . | nindent 4 }}
   ports:
     - port: 443
       protocol: TCP
