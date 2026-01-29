@@ -111,9 +111,7 @@ spec:
   # ... other fields
 ```
 
-The operator exposes webhook endpoints:
-- GitHub: `http://<service>:8081/webhooks/github`
-- GitLab: `http://<service>:8081/webhooks/gitlab`
+The operator exposes a webhook endpoint at `/webhooks/git` (via the git-webhook-service) that auto-detects GitHub and GitLab.
 
 ## Development
 
