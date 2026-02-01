@@ -118,7 +118,7 @@ func (r *ImageBuildReconciler) reconcileBuild(
 			return err
 		}
 		if actual.Labels == nil {
-			actual.Labels = map[string]string{}
+			actual.Labels = make(map[string]string, len(desired.Labels))
 		}
 		for k, v := range desired.Labels {
 			actual.Labels[k] = v
