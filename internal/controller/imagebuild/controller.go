@@ -180,7 +180,7 @@ func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if err := r.reconcileBuild(ctx, imageBuild, selectedStrategyName); err != nil {
-		if errors.Is(err, ErrBuildStrategyNotFound) {
+		if apierrors.IsNotFound(err) {
 			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildStrategyNotFound, err.Error())
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}

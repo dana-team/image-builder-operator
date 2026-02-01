@@ -2,10 +2,8 @@ package imagebuild
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,8 +14,6 @@ import (
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 )
-
-var ErrBuildStrategyNotFound = errors.New("clusterbuildstrategy not found")
 
 func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
 	return ib.Name + "-build"
@@ -105,9 +101,6 @@ func (r *ImageBuildReconciler) reconcileBuild(
 
 	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
 	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
-		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("%w: %q", ErrBuildStrategyNotFound, selectedStrategyName)
-		}
 		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", selectedStrategyName, err)
 	}
 
