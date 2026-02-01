@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -104,7 +105,10 @@ func (r *ImageBuildReconciler) reconcileBuild(
 
 	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
 	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
-		return fmt.Errorf("%w: %q: %w", ErrBuildStrategyNotFound, selectedStrategyName, err)
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("%w: %q", ErrBuildStrategyNotFound, selectedStrategyName)
+		}
+		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", selectedStrategyName, err)
 	}
 
 	desired := r.newBuild(ib, selectedStrategyName)
