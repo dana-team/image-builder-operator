@@ -205,3 +205,45 @@ func TestEnsureWebhookSecretMissingKey(t *testing.T) {
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 	requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey)
 }
+
+func TestReconcileBuildWithOptionalFields(t *testing.T) {
+	ctx := context.Background()
+
+	const (
+		testRevision      = "v1.2.3"
+		testContextDir    = "backend/api"
+		testCloneSecret   = "git-clone-secret"
+		testPushSecret    = "registry-push-secret"
+	)
+
+	policy := newImageBuildPolicy()
+	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+
+	ib.Spec.Source.Git.Revision = testRevision
+	ib.Spec.Source.ContextDir = testContextDir
+	ib.Spec.Source.Git.CloneSecret = &corev1.LocalObjectReference{Name: testCloneSecret}
+	ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testPushSecret}
+
+	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{
+		ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+	}
+
+	r, c := newReconciler(t, ib, policy, clusterBuildStrategy)
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace}})
+	require.NoError(t, err)
+
+	build := &shipwright.Build{}
+	require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildNameFor(ib), Namespace: ib.Namespace}, build))
+
+	require.NotNil(t, build.Spec.Source.Git.Revision, "Git Revision should be set")
+	require.Equal(t, testRevision, *build.Spec.Source.Git.Revision)
+
+	require.NotNil(t, build.Spec.Source.ContextDir, "ContextDir should be set")
+	require.Equal(t, testContextDir, *build.Spec.Source.ContextDir)
+
+	require.NotNil(t, build.Spec.Source.Git.CloneSecret, "CloneSecret should be set")
+	require.Equal(t, testCloneSecret, *build.Spec.Source.Git.CloneSecret)
+
+	require.NotNil(t, build.Spec.Output.PushSecret, "PushSecret should be set")
+	require.Equal(t, testPushSecret, *build.Spec.Output.PushSecret)
+}
