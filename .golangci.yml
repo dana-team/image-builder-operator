@@ -23,6 +23,7 @@ linters:
     - unused
     - contextcheck
     - errorlint
+    - bodyclose
   settings:
     revive:
       rules:
