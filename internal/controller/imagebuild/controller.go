@@ -31,8 +31,9 @@ const (
 	imageBuildControllerName = "ImageBuildController"
 	ImageBuildPolicyName     = "image-build-policy"
 
-	indexPushSecret  = "pushSecret"
-	indexCloneSecret = "cloneSecret"
+	indexPushSecret    = "pushSecret"
+	indexCloneSecret   = "cloneSecret"
+	indexWebhookSecret = "webhookSecret"
 )
 
 type ImageBuildReconciler struct {
@@ -75,6 +76,16 @@ func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexWebhookSecret, func(obj client.Object) []string {
+		ib := obj.(*buildv1alpha1.ImageBuild)
+		if ib.Spec.OnCommit != nil {
+			return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
@@ -84,7 +95,6 @@ func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// secretWatchPredicate filters Secret events to only trigger on Create events.
 func (r *ImageBuildReconciler) secretWatchPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -111,7 +121,7 @@ func (r *ImageBuildReconciler) mapSecretToImageBuilds() handler.EventHandler {
 
 		var requests []reconcile.Request
 
-		for _, indexKey := range []string{indexPushSecret, indexCloneSecret} {
+		for _, indexKey := range []string{indexPushSecret, indexCloneSecret, indexWebhookSecret} {
 			imageBuilds := &buildv1alpha1.ImageBuildList{}
 			if err := r.List(ctx, imageBuilds,
 				client.InNamespace(secret.Namespace),
@@ -149,9 +159,12 @@ func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
+	if err := r.ensureWebhookSecret(ctx, imageBuild); err != nil {
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	var alreadyOwned *controllerutil.AlreadyOwnedError
 
-	// Inline policy fetch (cluster-scoped ImageBuildPolicy)
 	policy := &buildv1alpha1.ImageBuildPolicy{}
 	if err := r.Get(ctx, client.ObjectKey{Name: ImageBuildPolicyName}, policy); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing")
@@ -278,3 +291,36 @@ func (r *ImageBuildReconciler) ensureBuildRun(
 
 	return nil, nil, nil
 }
+
+func (r *ImageBuildReconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	if ib.Spec.OnCommit == nil {
+		return nil
+	}
+
+	secretName := ib.Spec.OnCommit.WebhookSecretRef.Name
+	secretKey := ib.Spec.OnCommit.WebhookSecretRef.Key
+
+	secret := &corev1.Secret{}
+	key := client.ObjectKey{
+		Namespace: ib.Namespace,
+		Name:      secretName,
+	}
+
+	if err := r.Get(ctx, key, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			msg := fmt.Sprintf("WebhookSecret %q not found", secretName)
+			_ = r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretMissing, msg)
+			return errors.New(msg)
+		}
+		return err
+	}
+
+	if _, ok := secret.Data[secretKey]; !ok {
+		msg := fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey)
+		_ = r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey, msg)
+		return errors.New(msg)
+	}
+
+	return nil
+}
+
