@@ -104,7 +104,7 @@ func (r *ImageBuildReconciler) reconcileBuild(
 
 	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
 	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
-		return fmt.Errorf("%w: %q: %v", ErrBuildStrategyNotFound, selectedStrategyName, err)
+		return fmt.Errorf("%w: %q: %w", ErrBuildStrategyNotFound, selectedStrategyName, err)
 	}
 
 	desired := r.newBuild(ib, selectedStrategyName)

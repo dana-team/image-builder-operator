@@ -21,6 +21,8 @@ linters:
     - unconvert
     - unparam
     - unused
+    - contextcheck
+    - errorlint
   settings:
     revive:
       rules:
