@@ -323,4 +323,3 @@ func (r *ImageBuildReconciler) ensureWebhookSecret(ctx context.Context, ib *buil
 
 	return nil
 }
-

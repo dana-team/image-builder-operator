@@ -205,4 +205,3 @@ func TestEnsureWebhookSecretMissingKey(t *testing.T) {
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 	requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey)
 }
-
