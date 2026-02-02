@@ -89,7 +89,7 @@ func TestReconcileBuild(t *testing.T) {
 			requireReconcile(t, ctx, r, ib)
 
 			latest := requireStatus(t, c, ctx, ib, ib.Generation, buildNameFor(ib))
-			requireBuild(t, c, ctx, latest, absentStrategy)
+			requireBuild(t, c, ctx, latest)
 		})
 
 		t.Run("corrects Build spec drift on reconcile", func(t *testing.T) {
@@ -97,7 +97,7 @@ func TestReconcileBuild(t *testing.T) {
 
 			requireReconcile(t, ctx, r, ib)
 
-			build := requireBuild(t, c, ctx, ib, absentStrategy)
+			build := requireBuild(t, c, ctx, ib)
 			require.Equal(t, ib.Spec.Source.Git.URL, build.Spec.Source.Git.URL)
 
 			build.Spec.Source.Git.URL = "https://drifted-url.com"
@@ -105,7 +105,7 @@ func TestReconcileBuild(t *testing.T) {
 
 			requireReconcile(t, ctx, r, ib)
 
-			build = requireBuild(t, c, ctx, ib, absentStrategy)
+			build = requireBuild(t, c, ctx, ib)
 			require.Equal(t, ib.Spec.Source.Git.URL, build.Spec.Source.Git.URL, "Build spec should be corrected")
 		})
 
@@ -131,7 +131,7 @@ func TestReconcileBuild(t *testing.T) {
 
 			requireReconcile(t, ctx, r, ib)
 
-			build := requireBuild(t, c, ctx, ib, absentStrategy)
+			build := requireBuild(t, c, ctx, ib)
 
 			require.NotNil(t, build.Spec.Source.Git.Revision)
 			require.Equal(t, testRevision, *build.Spec.Source.Git.Revision)
@@ -179,7 +179,7 @@ func TestReconcileBuild(t *testing.T) {
 
 			requireReconcile(t, ctx, r, ib)
 
-			build := requireBuild(t, c, ctx, ib, absentStrategy)
+			build := requireBuild(t, c, ctx, ib)
 			require.NotNil(t, build.Labels)
 			require.Equal(t, ib.Name, build.Labels["build.dana.io/parent-imagebuild"])
 		})
@@ -318,7 +318,6 @@ func requireBuild(
 	c client.Client,
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
-	wantStrategy string,
 ) *shipwright.Build {
 	t.Helper()
 
@@ -328,7 +327,7 @@ func requireBuild(
 		Namespace: ib.Namespace,
 	}, build))
 	require.True(t, metav1.IsControlledBy(build, ib))
-	require.Equal(t, wantStrategy, build.Spec.Strategy.Name)
+	require.Equal(t, absentStrategy, build.Spec.Strategy.Name)
 	return build
 }
 
