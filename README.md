@@ -1,6 +1,9 @@
 # image-builder-operator
 
 Kubernetes operator for building container images from source code.
+It simplifies builds from source for developers, and lets them build their
+source without cluster-scope RBAC by encapsulating cluster-level resource
+management for platform administrators.
 
 ## Prerequisites
 
