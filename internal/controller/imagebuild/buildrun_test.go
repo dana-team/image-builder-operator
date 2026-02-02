@@ -15,115 +15,90 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func TestReconcileCreatesBuildRun(t *testing.T) {
+func TestReconcileBuildRun(t *testing.T) {
 	ctx := context.Background()
 
-	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-	r, c := newReconciler(t, ib)
+	t.Run("creates BuildRun when it does not exist", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, c := newReconciler(t, ib)
 
-	br, err := r.reconcileBuildRun(ctx, ib)
-	require.NoError(t, err)
-	require.NotNil(t, br)
+		br, err := r.reconcileBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.NotNil(t, br)
 
-	actualBuildRun := &shipwright.BuildRun{}
-	require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildRunNameFor(ib, ib.Status.BuildRunCounter), Namespace: ib.Namespace}, actualBuildRun))
-	require.Equal(t, buildRunNameFor(ib, ib.Status.BuildRunCounter), actualBuildRun.Name)
-	require.Equal(t, ib.Namespace, actualBuildRun.Namespace)
+		actualBuildRun := &shipwright.BuildRun{}
+		require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildRunNameFor(ib, ib.Status.BuildRunCounter), Namespace: ib.Namespace}, actualBuildRun))
+		require.Equal(t, buildRunNameFor(ib, ib.Status.BuildRunCounter), actualBuildRun.Name)
+		require.Equal(t, ib.Namespace, actualBuildRun.Namespace)
 
-	require.True(t, metav1.IsControlledBy(actualBuildRun, ib), "BuildRun should be controller-owned by ImageBuild")
-	require.NotNil(t, actualBuildRun.Spec.Build.Name)
-	require.Equal(t, buildNameFor(ib), *actualBuildRun.Spec.Build.Name)
-}
+		require.True(t, metav1.IsControlledBy(actualBuildRun, ib), "BuildRun should be controller-owned by ImageBuild")
+		require.NotNil(t, actualBuildRun.Spec.Build.Name)
+		require.Equal(t, buildNameFor(ib), *actualBuildRun.Spec.Build.Name)
+	})
 
-func TestReconcileReusesExistingBuildRun(t *testing.T) {
-	ctx := context.Background()
+	t.Run("reuses existing BuildRun", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.UID = types.UID("ib-uid")
+		ib.Status.BuildRunCounter = 0
+		existingBuildRun := newBuildRun(ib, 1)
+		existingBuildRun.UID = types.UID("existing-buildrun-uid")
 
-	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-	ib.UID = types.UID("ib-uid")
-	ib.Status.BuildRunCounter = 0
-	existingBuildRun := newBuildRun(ib, 1)
-	existingBuildRun.UID = types.UID("existing-buildrun-uid")
+		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuildRun, testScheme(t)))
 
-	require.NoError(t, controllerutil.SetControllerReference(ib, existingBuildRun, testScheme(t)))
+		r, _ := newReconciler(t, ib, existingBuildRun)
+		br, err := r.reconcileBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Equal(t, existingBuildRun.Name, br.Name)
+		require.Equal(t, existingBuildRun.UID, br.UID, "expected reconcileBuildRun to return the existing BuildRun object")
+	})
 
-	r, _ := newReconciler(t, ib, existingBuildRun)
-	br, err := r.reconcileBuildRun(ctx, ib)
-	require.NoError(t, err)
-	require.Equal(t, existingBuildRun.Name, br.Name)
-	require.Equal(t, existingBuildRun.UID, br.UID, "expected reconcileBuildRun to return the existing BuildRun object")
-}
+	t.Run("fails when BuildRun owned by another ImageBuild", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.BuildRunCounter = 0
+		conflict := newBuildRun(ib, 1)
 
-func TestReconcileBuildRunConflict(t *testing.T) {
-	ctx := context.Background()
+		otherOwner := &buildv1alpha1.ImageBuild{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "someone-else",
+				UID:  types.UID("other-uid"),
+			},
+		}
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
 
-	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-	ib.Status.BuildRunCounter = 0
-	conflict := newBuildRun(ib, 1)
+		r, _ := newReconciler(t, ib, conflict)
+		br, err := r.reconcileBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.Error(t, err)
 
-	otherOwner := &buildv1alpha1.ImageBuild{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "someone-else",
-			UID:  types.UID("other-uid"),
-		},
-	}
-	require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
-
-	r, _ := newReconciler(t, ib, conflict)
-	br, err := r.reconcileBuildRun(ctx, ib)
-	require.Nil(t, br)
-	require.Error(t, err)
-
-	var alreadyOwned *controllerutil.AlreadyOwnedError
-	require.ErrorAs(t, err, &alreadyOwned)
+		var alreadyOwned *controllerutil.AlreadyOwnedError
+		require.ErrorAs(t, err, &alreadyOwned, "Should return AlreadyOwnedError when BuildRun has different owner")
+	})
 }
 
 func TestPatchBuildSucceededCondition(t *testing.T) {
 	ctx := context.Background()
 
-	newBR := func(t *testing.T) *shipwright.BuildRun {
-		t.Helper()
-		return &shipwright.BuildRun{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "br",
-				Namespace: "ns-" + t.Name(),
-			},
-		}
-	}
-
-	assertBuildSucceeded := func(t *testing.T, br *shipwright.BuildRun, expectedStatus metav1.ConditionStatus, expectedReason string) {
-		t.Helper()
-
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		r, _ := newReconciler(t, ib)
-
-		require.NoError(t, r.patchBuildSucceededCondition(ctx, ib, br))
-
-		requireCondition(t, ib.Status.Conditions, TypeBuildSucceeded, expectedStatus, expectedReason)
-		buildSucceededCond := meta.FindStatusCondition(ib.Status.Conditions, TypeBuildSucceeded)
-		require.Equal(t, ib.Generation, buildSucceededCond.ObservedGeneration)
-	}
-
 	t.Run("Succeeded condition missing => Pending/Unknown", func(t *testing.T) {
-		br := newBR(t)
-		assertBuildSucceeded(t, br, metav1.ConditionUnknown, ReasonBuildRunPending)
+		br := newTestBuildRun(t)
+		requireBuildSucceeded(t, ctx, br, metav1.ConditionUnknown, ReasonBuildRunPending)
 	})
 
 	t.Run("Succeeded=True => Succeeded/True", func(t *testing.T) {
-		br := newBR(t)
+		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionTrue})
-		assertBuildSucceeded(t, br, metav1.ConditionTrue, ReasonBuildRunSucceeded)
+		requireBuildSucceeded(t, ctx, br, metav1.ConditionTrue, ReasonBuildRunSucceeded)
 	})
 
 	t.Run("Succeeded=False => Failed/False", func(t *testing.T) {
-		br := newBR(t)
+		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionFalse})
-		assertBuildSucceeded(t, br, metav1.ConditionFalse, ReasonBuildRunFailed)
+		requireBuildSucceeded(t, ctx, br, metav1.ConditionFalse, ReasonBuildRunFailed)
 	})
 
 	t.Run("Succeeded=Unknown => Running/Unknown", func(t *testing.T) {
-		br := newBR(t)
+		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionUnknown})
-		assertBuildSucceeded(t, br, metav1.ConditionUnknown, ReasonBuildRunRunning)
+		requireBuildSucceeded(t, ctx, br, metav1.ConditionUnknown, ReasonBuildRunRunning)
 	})
 }
 
@@ -320,4 +295,27 @@ func TestIsNewBuildRequired(t *testing.T) {
 
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
+}
+
+func newTestBuildRun(t *testing.T) *shipwright.BuildRun {
+	t.Helper()
+	return &shipwright.BuildRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "br",
+			Namespace: "ns-" + t.Name(),
+		},
+	}
+}
+
+func requireBuildSucceeded(t *testing.T, ctx context.Context, br *shipwright.BuildRun, expectedStatus metav1.ConditionStatus, expectedReason string) {
+	t.Helper()
+
+	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+	r, _ := newReconciler(t, ib)
+
+	require.NoError(t, r.patchBuildSucceededCondition(ctx, ib, br))
+
+	requireCondition(t, ib.Status.Conditions, TypeBuildSucceeded, expectedStatus, expectedReason)
+	buildSucceededCond := meta.FindStatusCondition(ib.Status.Conditions, TypeBuildSucceeded)
+	require.Equal(t, ib.Generation, buildSucceededCond.ObservedGeneration)
 }

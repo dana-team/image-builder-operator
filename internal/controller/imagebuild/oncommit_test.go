@@ -14,65 +14,69 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func TestTriggerNaming(t *testing.T) {
-	ib := newImageBuild("ib", "ns")
-	ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
-	ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-		Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: "refs/heads/main", CommitSHA: "abc"},
-	}
+func TestTriggerBuildRun(t *testing.T) {
+	ctx := context.Background()
 
-	policy := newImageBuildPolicy()
-	r, _ := newReconciler(t, policy, ib)
+	t.Run("creates BuildRun with oncommit naming", func(t *testing.T) {
+		ib := newImageBuild("ib", "ns")
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: "refs/heads/main", CommitSHA: "abc"},
+		}
 
-	br, requeue, err := r.triggerBuildRun(context.Background(), ib)
-	require.NoError(t, err)
-	require.Nil(t, requeue)
-	require.NotNil(t, br)
-	require.Equal(t, fmt.Sprintf("%s-buildrun-oncommit-1", ib.Name), br.Name)
-	require.Equal(t, "oncommit", br.Labels["build.dana.io/build-trigger"])
-}
+		policy := newImageBuildPolicy()
+		r, _ := newReconciler(t, policy, ib)
 
-func TestTriggerActiveBuild(t *testing.T) {
-	ib := newImageBuild("ib", "ns")
-	ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
-	ib.Status.LastBuildRunRef = "active-br"
-	ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-		Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: "refs/heads/main", CommitSHA: "abc"},
-	}
+		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.NotNil(t, br)
+		require.Equal(t, fmt.Sprintf("%s-buildrun-oncommit-1", ib.Name), br.Name)
+		require.Equal(t, "oncommit", br.Labels["build.dana.io/build-trigger"])
+	})
 
-	activeBR := &shipwright.BuildRun{
-		ObjectMeta: metav1.ObjectMeta{Name: "active-br", Namespace: ib.Namespace},
-	}
-	require.NoError(t, controllerutil.SetControllerReference(ib, activeBR, testScheme(t)))
+	t.Run("returns active BuildRun when present", func(t *testing.T) {
+		ib := newImageBuild("ib", "ns")
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+		ib.Status.LastBuildRunRef = "active-br"
+		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: "refs/heads/main", CommitSHA: "abc"},
+		}
 
-	policy := newImageBuildPolicy()
-	r, _ := newReconciler(t, policy, ib, activeBR)
+		activeBR := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{Name: "active-br", Namespace: ib.Namespace},
+		}
+		require.NoError(t, controllerutil.SetControllerReference(ib, activeBR, testScheme(t)))
 
-	br, requeue, err := r.triggerBuildRun(context.Background(), ib)
-	require.NoError(t, err)
-	require.Nil(t, requeue)
-	require.NotNil(t, br, "should return the active BuildRun for status mapping")
-	require.Equal(t, activeBR.Name, br.Name)
-}
+		policy := newImageBuildPolicy()
+		r, _ := newReconciler(t, policy, ib, activeBR)
 
-func TestTriggerDebounce(t *testing.T) {
-	now := time.Now()
-	ib := newImageBuild("ib", "ns")
-	ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
-	ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-		Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
-			Ref:        "refs/heads/main",
-			CommitSHA:  "abc",
-			ReceivedAt: metav1.NewTime(now),
-		},
-	}
+		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.NotNil(t, br, "should return the active BuildRun for status mapping")
+		require.Equal(t, activeBR.Name, br.Name)
+	})
 
-	policy := newImageBuildPolicy()
-	r, _ := newReconciler(t, policy, ib)
+	t.Run("requeues for debounce when event recently received", func(t *testing.T) {
+		now := time.Now()
+		ib := newImageBuild("ib", "ns")
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
+				Ref:        "refs/heads/main",
+				CommitSHA:  "abc",
+				ReceivedAt: metav1.NewTime(now),
+			},
+		}
 
-	br, requeue, err := r.triggerBuildRun(context.Background(), ib)
-	require.NoError(t, err)
-	require.NotNil(t, requeue, "should requeue for debounce")
-	require.Nil(t, br)
-	require.True(t, *requeue > 0)
+		policy := newImageBuildPolicy()
+		r, _ := newReconciler(t, policy, ib)
+
+		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.NotNil(t, requeue, "should requeue for debounce")
+		require.Nil(t, br)
+		require.True(t, *requeue > 0)
+	})
 }
