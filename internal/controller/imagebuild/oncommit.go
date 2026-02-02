@@ -17,7 +17,6 @@ const (
 	onCommitLabelKey    = "build.dana.io/oncommit-enabled"
 )
 
-// ensureOnCommitLabel maintains the label required for the webhook handler to filter ImageBuilds.
 func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	desired := "false"
 	if ib.Spec.Rebuild != nil && ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit {
@@ -36,12 +35,6 @@ func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buil
 	return r.Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-// triggerBuildRun enforces debounce/rate-limit/one-active-build and creates a BuildRun
-// when a pending trigger is ready.
-//
-// Returns:
-// - selected BuildRun to use for status mapping (may be an existing active run)
-// - optional requeueAfter for debounce/rate-limit timers
 func (r *ImageBuildReconciler) triggerBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
