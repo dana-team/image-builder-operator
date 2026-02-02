@@ -96,22 +96,7 @@ spec:
 
 ### Automatic rebuilds on commit
 
-```yaml
-apiVersion: build.dana.io/v1alpha1
-kind: ImageBuild
-metadata:
-  name: my-app
-spec:
-  rebuild:
-    mode: OnCommit
-  onCommit:
-    webhookSecretRef:
-      name: webhook-secret
-      key: token
-  # ... other fields
-```
-
-The operator exposes a webhook endpoint at `/webhooks/git` (via the git-webhook-service) that auto-detects GitHub and GitLab.
+See `docs/git-webhook.md` for Git provider webhook setup.
 
 ## Development
 
