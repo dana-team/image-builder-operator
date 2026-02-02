@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -78,5 +79,41 @@ func TestTriggerBuildRun(t *testing.T) {
 		require.NotNil(t, requeue, "should requeue for debounce")
 		require.Nil(t, br)
 		require.True(t, *requeue > 0)
+	})
+}
+
+func TestEnsureOnCommitLabel(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("sets label when on-commit rebuild enabled", func(t *testing.T) {
+		ib := newImageBuild("ib", "ns")
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+
+		r, c := newReconciler(t, ib)
+
+		require.NoError(t, r.ensureOnCommitLabel(ctx, ib))
+		require.NotNil(t, ib.Labels)
+		require.Equal(t, "true", ib.Labels[onCommitLabelKey])
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.NotNil(t, latest.Labels)
+		require.Equal(t, "true", latest.Labels[onCommitLabelKey])
+	})
+
+	t.Run("clears label when on-commit rebuild disabled", func(t *testing.T) {
+		ib := newImageBuild("ib", "ns")
+		ib.Labels = map[string]string{onCommitLabelKey: "true"}
+
+		r, c := newReconciler(t, ib)
+
+		require.NoError(t, r.ensureOnCommitLabel(ctx, ib))
+		require.NotNil(t, ib.Labels)
+		require.Equal(t, "false", ib.Labels[onCommitLabelKey])
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.NotNil(t, latest.Labels)
+		require.Equal(t, "false", latest.Labels[onCommitLabelKey])
 	})
 }
