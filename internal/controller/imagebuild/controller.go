@@ -204,7 +204,7 @@ func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	var buildRun *shipwright.BuildRun
 
-	if br, requeueAfter, err := r.triggerBuildRun(ctx, imageBuild); err != nil {
+	if br, requeueAfter, err := r.reconcileRebuild(ctx, imageBuild); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error())
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	} else if requeueAfter != nil {

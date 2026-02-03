@@ -18,12 +18,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func TestTriggerBuildRun(t *testing.T) {
+const (
+	testCommitSHA      = "abc123"
+	differentCommitSHA = "xyz789"
+)
+
+func TestReconcileRebuild(t *testing.T) {
 	ctx := context.Background()
 	imageBuildName := "ib"
 	imageBuildNamespace := "ns"
 	refName := "refs/heads/main"
-	commitSHA := "abc"
 	expectedOnCommitBuildRunName := fmt.Sprintf("%s-buildrun-oncommit-1", imageBuildName)
 	failedBuildRunName := "failed-br"
 
@@ -31,13 +35,13 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -51,7 +55,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		activeBuildRunName := "active-br"
 		ib.Status.LastBuildRunRef = activeBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
 		activeBR := &shipwright.BuildRun{
@@ -62,7 +66,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, activeBR)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br, "should return the active BuildRun for status mapping")
@@ -73,17 +77,17 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 			LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{
 				Name:      expectedOnCommitBuildRunName,
-				CommitSHA: commitSHA,
+				CommitSHA: testCommitSHA,
 			},
 		}
 
 		policy := newImageBuildPolicy()
 		r, c := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.Nil(t, br)
@@ -102,7 +106,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
 			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
 				Ref:        refName,
-				CommitSHA:  commitSHA,
+				CommitSHA:  testCommitSHA,
 				ReceivedAt: metav1.NewTime(now),
 			},
 		}
@@ -110,7 +114,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, requeue, "should requeue for debounce")
 		require.Nil(t, br)
@@ -122,10 +126,10 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 			LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{
 				Name:        expectedOnCommitBuildRunName,
-				CommitSHA:   commitSHA,
+				CommitSHA:   testCommitSHA,
 				TriggeredAt: metav1.NewTime(now),
 			},
 		}
@@ -133,7 +137,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, requeue)
 		require.Nil(t, br)
@@ -146,7 +150,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = doneBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
 		doneBuildRun := &shipwright.BuildRun{
@@ -161,7 +165,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, doneBuildRun)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -173,7 +177,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = failedBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
 		failedBuildRun := &shipwright.BuildRun{
@@ -188,7 +192,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, failedBuildRun)
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -200,14 +204,14 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = "missing-br"
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 		r.Client = &getErrorClient{Client: r.Client, err: errors.New("boom")}
 
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.Error(t, err)
 		require.Nil(t, requeue)
 		require.Nil(t, br)
@@ -217,7 +221,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 		counter := int64(1)
 
@@ -234,7 +238,7 @@ func TestTriggerBuildRun(t *testing.T) {
 		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
-		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.Nil(t, br)
 		require.Nil(t, requeue)
 		require.Error(t, err)
@@ -242,6 +246,133 @@ func TestTriggerBuildRun(t *testing.T) {
 		var alreadyOwned *controllerutil.AlreadyOwnedError
 		require.ErrorAs(t, err, &alreadyOwned, "Should return AlreadyOwnedError when BuildRun has different owner")
 	})
+}
+
+func TestIsRebuildEnabled(t *testing.T) {
+	t.Run("returns false when rebuild nil", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{}
+		require.False(t, isRebuildEnabled(ib))
+	})
+
+	t.Run("returns false when mode not oncommit", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Spec: buildv1alpha1.ImageBuildSpec{
+				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: "manual"},
+			},
+		}
+		require.False(t, isRebuildEnabled(ib))
+	})
+
+	t.Run("returns false when no pending commit", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Spec: buildv1alpha1.ImageBuildSpec{
+				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
+			},
+			Status: buildv1alpha1.ImageBuildStatus{
+				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
+			},
+		}
+		require.False(t, isRebuildEnabled(ib))
+	})
+
+	t.Run("returns true when enabled and pending", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Spec: buildv1alpha1.ImageBuildSpec{
+				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
+			},
+			Status: buildv1alpha1.ImageBuildStatus{
+				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+					Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
+				},
+			},
+		}
+		require.True(t, isRebuildEnabled(ib))
+	})
+}
+
+func TestIsDuplicateCommit(t *testing.T) {
+	t.Run("returns false when no last triggered", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Status: buildv1alpha1.ImageBuildStatus{
+				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
+			},
+		}
+		require.False(t, isDuplicateCommit(ib, testCommitSHA))
+	})
+
+	t.Run("returns false when different commit", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Status: buildv1alpha1.ImageBuildStatus{
+				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+					LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: differentCommitSHA},
+				},
+			},
+		}
+		require.False(t, isDuplicateCommit(ib, testCommitSHA))
+	})
+
+	t.Run("returns true when same commit", func(t *testing.T) {
+		ib := &buildv1alpha1.ImageBuild{
+			Status: buildv1alpha1.ImageBuildStatus{
+				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+					LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: testCommitSHA},
+				},
+			},
+		}
+		require.True(t, isDuplicateCommit(ib, testCommitSHA))
+	})
+}
+
+func TestIsActiveBuildRun(t *testing.T) {
+	t.Run("returns true when condition nil", func(t *testing.T) {
+		br := &shipwright.BuildRun{}
+		require.True(t, isActiveBuildRun(br))
+	})
+
+	t.Run("returns false when succeeded", func(t *testing.T) {
+		br := &shipwright.BuildRun{}
+		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionTrue,
+		})
+		require.False(t, isActiveBuildRun(br))
+	})
+
+	t.Run("returns false when failed", func(t *testing.T) {
+		br := &shipwright.BuildRun{}
+		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+		})
+		require.False(t, isActiveBuildRun(br))
+	})
+
+	t.Run("returns true when running", func(t *testing.T) {
+		br := &shipwright.BuildRun{}
+		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionUnknown,
+		})
+		require.True(t, isActiveBuildRun(br))
+	})
+}
+
+func TestClearPendingCommit(t *testing.T) {
+	ctx := context.Background()
+	imageBuildName := "ib"
+	imageBuildNamespace := "ns"
+
+	ib := newImageBuild(imageBuildName, imageBuildNamespace)
+	ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+		Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
+	}
+
+	r, c := newReconciler(t, ib)
+	require.NoError(t, r.clearPendingCommit(ctx, ib))
+
+	latest := &buildv1alpha1.ImageBuild{}
+	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+	require.Nil(t, latest.Status.OnCommit.Pending)
 }
 
 func TestEnsureOnCommitLabel(t *testing.T) {

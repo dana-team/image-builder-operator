@@ -37,15 +37,11 @@ func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buil
 	return r.Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) triggerBuildRun(
+func (r *ImageBuildReconciler) reconcileRebuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *time.Duration, error) {
-	if ib.Spec.Rebuild == nil || ib.Spec.Rebuild.Mode != buildv1alpha1.ImageBuildRebuildModeOnCommit {
-		return nil, nil, nil
-	}
-
-	if ib.Status.OnCommit == nil || ib.Status.OnCommit.Pending == nil {
+	if !isRebuildEnabled(ib) {
 		return nil, nil, nil
 	}
 
@@ -54,35 +50,82 @@ func (r *ImageBuildReconciler) triggerBuildRun(
 	}
 
 	pendingCommit := ib.Status.OnCommit.Pending.CommitSHA
-	if ib.Status.OnCommit.LastTriggeredBuildRun != nil &&
-		ib.Status.OnCommit.LastTriggeredBuildRun.CommitSHA == pendingCommit {
-		orig := ib.DeepCopy()
-		ib.Status.OnCommit.Pending = nil
-		_ = r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+	if isDuplicateCommit(ib, pendingCommit) {
+		if err := r.clearPendingCommit(ctx, ib); err != nil {
+			return nil, nil, err
+		}
 		return nil, nil, nil
 	}
 
-	if ib.Status.LastBuildRunRef != "" {
-		active := &shipwright.BuildRun{}
-		if err := r.Get(ctx, client.ObjectKey{Namespace: ib.Namespace, Name: ib.Status.LastBuildRunRef}, active); err == nil {
-			if metav1.IsControlledBy(active, ib) {
-				cond := active.Status.GetCondition(shipwright.Succeeded)
-				if cond == nil || (cond.GetStatus() != corev1.ConditionTrue && cond.GetStatus() != corev1.ConditionFalse) {
-					return active, nil, nil
-				}
-			}
-		} else if client.IgnoreNotFound(err) != nil {
-			return nil, nil, err
-		}
+	activeBR, err := r.getActiveBuildRun(ctx, ib)
+	if err != nil || activeBR != nil {
+		return activeBR, nil, err
 	}
 
+	return r.createBuildRun(ctx, ib, pendingCommit)
+}
+
+func isRebuildEnabled(ib *buildv1alpha1.ImageBuild) bool {
+	return ib.Spec.Rebuild != nil &&
+		ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit &&
+		ib.Status.OnCommit != nil &&
+		ib.Status.OnCommit.Pending != nil
+}
+
+func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
+	if ib.Status.OnCommit.LastTriggeredBuildRun == nil {
+		return false
+	}
+	return ib.Status.OnCommit.LastTriggeredBuildRun.CommitSHA == commitSHA
+}
+
+func (r *ImageBuildReconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	orig := ib.DeepCopy()
+	ib.Status.OnCommit.Pending = nil
+	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+}
+
+func (r *ImageBuildReconciler) getActiveBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+) (*shipwright.BuildRun, error) {
+	if ib.Status.LastBuildRunRef == "" {
+		return nil, nil
+	}
+
+	active := &shipwright.BuildRun{}
+	key := client.ObjectKey{Namespace: ib.Namespace, Name: ib.Status.LastBuildRunRef}
+	if err := r.Get(ctx, key, active); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	if metav1.IsControlledBy(active, ib) && isActiveBuildRun(active) {
+		return active, nil
+	}
+	return nil, nil
+}
+
+func isActiveBuildRun(br *shipwright.BuildRun) bool {
+	cond := br.Status.GetCondition(shipwright.Succeeded)
+	if cond == nil {
+		return true
+	}
+	status := cond.GetStatus()
+	return status != corev1.ConditionTrue && status != corev1.ConditionFalse
+}
+
+func (r *ImageBuildReconciler) createBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+	commitSHA string,
+) (*shipwright.BuildRun, *time.Duration, error) {
 	counter := nextTrigger(ib)
-	desired := newBuildRun(ib, 0)
-	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	desired.Labels["build.dana.io/build-trigger"] = "oncommit"
+	br := newBuildRun(ib, counter)
+	br.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
+	br.Labels["build.dana.io/build-trigger"] = "oncommit"
 
 	existing := &shipwright.BuildRun{}
-	key := client.ObjectKeyFromObject(desired)
+	key := client.ObjectKeyFromObject(br)
 	if err := r.Get(ctx, key, existing); err == nil {
 		if !metav1.IsControlledBy(existing, ib) {
 			return nil, nil, &controllerutil.AlreadyOwnedError{Object: existing}
@@ -92,16 +135,13 @@ func (r *ImageBuildReconciler) triggerBuildRun(
 		return nil, nil, err
 	}
 
-	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(ib, br, r.Scheme); err != nil {
 		return nil, nil, err
 	}
-	if err := r.Create(ctx, desired); err != nil {
+	if err := r.Create(ctx, br); err != nil {
 		return nil, nil, err
 	}
-
-	br := desired
-
-	if err := r.markTriggered(ctx, ib, br, counter, pendingCommit); err != nil {
+	if err := r.markTriggered(ctx, ib, br, counter, commitSHA); err != nil {
 		return nil, nil, err
 	}
 
