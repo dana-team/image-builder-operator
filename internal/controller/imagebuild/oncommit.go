@@ -19,24 +19,6 @@ const (
 	onCommitLabelKey    = "build.dana.io/oncommit-enabled"
 )
 
-func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
-	desired := "false"
-	if ib.Spec.Rebuild != nil && ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit {
-		desired = "true"
-	}
-
-	if ib.Labels == nil {
-		ib.Labels = map[string]string{}
-	}
-	if ib.Labels[onCommitLabelKey] == desired {
-		return nil
-	}
-
-	orig := ib.DeepCopy()
-	ib.Labels[onCommitLabelKey] = desired
-	return r.Patch(ctx, ib, client.MergeFrom(orig))
-}
-
 func (r *ImageBuildReconciler) reconcileRebuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
@@ -63,6 +45,24 @@ func (r *ImageBuildReconciler) reconcileRebuild(
 	}
 
 	return r.createBuildRun(ctx, ib, pendingCommit)
+}
+
+func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	desired := "false"
+	if ib.Spec.Rebuild != nil && ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit {
+		desired = "true"
+	}
+
+	if ib.Labels == nil {
+		ib.Labels = map[string]string{}
+	}
+	if ib.Labels[onCommitLabelKey] == desired {
+		return nil
+	}
+
+	orig := ib.DeepCopy()
+	ib.Labels[onCommitLabelKey] = desired
+	return r.Patch(ctx, ib, client.MergeFrom(orig))
 }
 
 func isRebuildEnabled(ib *buildv1alpha1.ImageBuild) bool {
