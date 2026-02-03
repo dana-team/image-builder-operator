@@ -126,6 +126,31 @@ func TestComputeLatestImage(t *testing.T) {
 	})
 }
 
+func TestPatchLatestImage(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("empty latest image => no-op", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, _ := newReconciler(t, ib)
+
+		require.NoError(t, r.patchLatestImage(ctx, ib, ""))
+
+		require.Empty(t, ib.Status.LatestImage)
+		require.Zero(t, ib.Status.ObservedGeneration)
+	})
+
+	t.Run("latest image set => patch status", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, _ := newReconciler(t, ib)
+		latest := "registry.example.com/team/app@sha256:abc"
+
+		require.NoError(t, r.patchLatestImage(ctx, ib, latest))
+
+		require.Equal(t, latest, ib.Status.LatestImage)
+		require.Equal(t, ib.Generation, ib.Status.ObservedGeneration)
+	})
+}
+
 func TestIsNewBuildRequired(t *testing.T) {
 	ctx := context.Background()
 	const testBuildRunName = "some-buildrun"
