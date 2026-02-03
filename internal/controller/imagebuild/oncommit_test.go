@@ -13,6 +13,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -210,6 +211,36 @@ func TestTriggerBuildRun(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, requeue)
 		require.Nil(t, br)
+	})
+
+	t.Run("returns conflict when BuildRun owned by another ImageBuild", func(t *testing.T) {
+		ib := newImageBuild(imageBuildName, imageBuildNamespace)
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
+		}
+		counter := int64(1)
+
+		conflict := newBuildRun(ib, 0)
+		conflict.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
+
+		otherOwner := &buildv1alpha1.ImageBuild{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "someone-else",
+				Namespace: ib.Namespace,
+				UID:       types.UID("other-uid"),
+			},
+		}
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
+
+		r, _ := newReconciler(t, ib, conflict)
+		br, requeue, err := r.triggerBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.Nil(t, requeue)
+		require.Error(t, err)
+
+		var alreadyOwned *controllerutil.AlreadyOwnedError
+		require.ErrorAs(t, err, &alreadyOwned, "Should return AlreadyOwnedError when BuildRun has different owner")
 	})
 }
 

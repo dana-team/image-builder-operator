@@ -176,31 +176,6 @@ func (r *ImageBuildReconciler) patchLatestImage(
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) ensureBuildRunOnCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild, counter int64) (*shipwright.BuildRun, error) {
-	desired := newBuildRun(ib, 0)
-	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	desired.Labels["build.dana.io/build-trigger"] = "oncommit"
-
-	existing := &shipwright.BuildRun{}
-	key := client.ObjectKeyFromObject(desired)
-	if err := r.Get(ctx, key, existing); err == nil {
-		if !metav1.IsControlledBy(existing, ib) {
-			return nil, &controllerutil.AlreadyOwnedError{Object: existing}
-		}
-		return existing, nil
-	} else if client.IgnoreNotFound(err) != nil {
-		return nil, err
-	}
-
-	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
-		return nil, err
-	}
-	if err := r.Create(ctx, desired); err != nil {
-		return nil, err
-	}
-	return desired, nil
-}
-
 func (r *ImageBuildReconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 

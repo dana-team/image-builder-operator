@@ -2,6 +2,7 @@ package imagebuild
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -9,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -75,10 +77,29 @@ func (r *ImageBuildReconciler) triggerBuildRun(
 	}
 
 	counter := nextTrigger(ib)
-	br, err := r.ensureBuildRunOnCommit(ctx, ib, counter)
-	if err != nil {
+	desired := newBuildRun(ib, 0)
+	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
+	desired.Labels["build.dana.io/build-trigger"] = "oncommit"
+
+	existing := &shipwright.BuildRun{}
+	key := client.ObjectKeyFromObject(desired)
+	if err := r.Get(ctx, key, existing); err == nil {
+		if !metav1.IsControlledBy(existing, ib) {
+			return nil, nil, &controllerutil.AlreadyOwnedError{Object: existing}
+		}
+		return existing, nil, nil
+	} else if client.IgnoreNotFound(err) != nil {
 		return nil, nil, err
 	}
+
+	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := r.Create(ctx, desired); err != nil {
+		return nil, nil, err
+	}
+
+	br := desired
 
 	if err := r.markTriggered(ctx, ib, br, counter, pendingCommit); err != nil {
 		return nil, nil, err
