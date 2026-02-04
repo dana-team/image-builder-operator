@@ -2,6 +2,8 @@ package imagebuild
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -158,6 +160,25 @@ func TestComputeLatestImage(t *testing.T) {
 		ib.Spec.Output.Image = "registry.example.com/team/app"
 		br := &shipwright.BuildRun{}
 		require.Equal(t, "", computeLatestImage(ib, br))
+	})
+}
+
+func TestHasTagOrDigest(t *testing.T) {
+	t.Run("invalid image name => false", func(t *testing.T) {
+		require.False(t, hasTagOrDigest("not a valid image@@@"))
+	})
+
+	t.Run("tagged image => true", func(t *testing.T) {
+		require.True(t, hasTagOrDigest("registry.example.com/team/app:v1"))
+	})
+
+	t.Run("digest image => true", func(t *testing.T) {
+		digest := sha256.Sum256([]byte("digest"))
+		require.True(t, hasTagOrDigest("registry.example.com/team/app@sha256:"+fmt.Sprintf("%x", digest)))
+	})
+
+	t.Run("name-only image => false", func(t *testing.T) {
+		require.False(t, hasTagOrDigest("registry.example.com/team/app"))
 	})
 }
 
