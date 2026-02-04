@@ -412,16 +412,3 @@ func TestEnsureOnCommitLabel(t *testing.T) {
 		require.Equal(t, "false", latest.Labels[onCommitLabelKey])
 	})
 }
-
-type getErrorClient struct {
-	client.Client
-	err error
-}
-
-func (c *getErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	// Inject a non-NotFound error for BuildRun fetches to exercise error handling.
-	if _, ok := obj.(*shipwright.BuildRun); ok {
-		return c.err
-	}
-	return c.Client.Get(ctx, key, obj, opts...)
-}

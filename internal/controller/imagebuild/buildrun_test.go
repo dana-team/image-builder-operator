@@ -3,6 +3,7 @@ package imagebuild
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -75,6 +76,16 @@ func TestReconcileBuildRun(t *testing.T) {
 
 		var alreadyOwned *controllerutil.AlreadyOwnedError
 		require.ErrorAs(t, err, &alreadyOwned, "Should return AlreadyOwnedError when BuildRun has different owner")
+	})
+
+	t.Run("returns error when Get fails", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, _ := newReconciler(t, ib)
+		r.Client = &getErrorClient{Client: r.Client, err: errors.New("boom")}
+
+		br, err := r.reconcileBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.Error(t, err)
 	})
 }
 

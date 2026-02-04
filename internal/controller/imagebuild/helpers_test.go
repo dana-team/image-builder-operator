@@ -1,6 +1,7 @@
 package imagebuild
 
 import (
+	"context"
 	"testing"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -89,4 +90,17 @@ func requireCondition(
 	require.NotNil(t, cond, "%s condition should be set", condType)
 	require.Equal(t, status, cond.Status)
 	require.Equal(t, reason, cond.Reason)
+}
+
+type getErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c *getErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	// Inject a non-NotFound error for BuildRun fetches to exercise error handling.
+	if _, ok := obj.(*shipwright.BuildRun); ok {
+		return c.err
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
 }
