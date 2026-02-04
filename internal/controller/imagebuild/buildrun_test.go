@@ -2,6 +2,7 @@ package imagebuild
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -99,6 +100,40 @@ func TestPatchBuildSucceededCondition(t *testing.T) {
 		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionUnknown})
 		requireBuildSucceeded(t, ctx, br, metav1.ConditionUnknown, ReasonBuildRunRunning)
+	})
+}
+
+func TestDeriveBuildSucceededStatus(t *testing.T) {
+	t.Run("Succeeded=False => includes BuildRun message", func(t *testing.T) {
+		br := newTestBuildRun(t)
+		br.Status.SetCondition(&shipwright.Condition{
+			Type:    shipwright.Succeeded,
+			Status:  corev1.ConditionFalse,
+			Message: "step failed",
+		})
+
+		status, reason, message := deriveBuildSucceededStatus(br)
+
+		require.Equal(t, metav1.ConditionFalse, status)
+		require.Equal(t, ReasonBuildRunFailed, reason)
+		require.True(t, strings.HasPrefix(message, "BuildRun failed"), "expected message to start with failure prefix")
+		require.Contains(t, message, "step failed")
+	})
+
+	t.Run("Succeeded=Unknown => includes BuildRun message", func(t *testing.T) {
+		br := newTestBuildRun(t)
+		br.Status.SetCondition(&shipwright.Condition{
+			Type:    shipwright.Succeeded,
+			Status:  corev1.ConditionUnknown,
+			Message: "waiting for pod",
+		})
+
+		status, reason, message := deriveBuildSucceededStatus(br)
+
+		require.Equal(t, metav1.ConditionUnknown, status)
+		require.Equal(t, ReasonBuildRunRunning, reason)
+		require.True(t, strings.HasPrefix(message, "BuildRun is running"), "expected message to start with running prefix")
+		require.Contains(t, message, "waiting for pod")
 	})
 }
 
