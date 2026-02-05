@@ -92,6 +92,38 @@ func requireCondition(
 	require.Equal(t, reason, cond.Reason)
 }
 
+func newClientWithSecretIndexes(t *testing.T, objects ...client.Object) client.Client {
+	t.Helper()
+
+	scheme := testScheme(t)
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
+		WithIndex(&buildv1alpha1.ImageBuild{}, indexPushSecret, func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.Output.PushSecret != nil {
+				return []string{ib.Spec.Output.PushSecret.Name}
+			}
+			return nil
+		}).
+		WithIndex(&buildv1alpha1.ImageBuild{}, indexCloneSecret, func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.Source.Git.CloneSecret != nil {
+				return []string{ib.Spec.Source.Git.CloneSecret.Name}
+			}
+			return nil
+		}).
+		WithIndex(&buildv1alpha1.ImageBuild{}, indexWebhookSecret, func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.OnCommit != nil && ib.Spec.OnCommit.WebhookSecretRef.Name != "" {
+				return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
+			}
+			return nil
+		}).
+		WithObjects(objects...).
+		Build()
+}
+
 type getErrorClient struct {
 	client.Client
 	err error

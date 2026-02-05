@@ -12,8 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -172,4 +175,55 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 	latest := &buildv1alpha1.ImageBuild{}
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 	return latest
+}
+
+func TestMapSecretToImageBuilds(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("ignores secrets not referenced by any ImageBuild", func(t *testing.T) {
+		c := newClientWithSecretIndexes(t)
+		r := &ImageBuildReconciler{Client: c, Scheme: testScheme(t)}
+		handler := r.mapSecretToImageBuilds()
+		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+		defer queue.ShutDown()
+
+		unreferencedSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "unreferenced-secret",
+				Namespace: "default",
+			},
+		}
+		handler.Create(ctx, event.CreateEvent{Object: unreferencedSecret}, queue)
+
+		require.Zero(t, queue.Len())
+	})
+
+	t.Run("enqueues ImageBuild matching secret index", func(t *testing.T) {
+		const secretName = "push-secret"
+		const namespace = "ns"
+		const imageBuildName = "ib"
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+		}
+
+		ibPush := newImageBuild(imageBuildName, namespace)
+		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+
+		c := newClientWithSecretIndexes(t, secret, ibPush)
+		r := &ImageBuildReconciler{Client: c, Scheme: testScheme(t)}
+		handler := r.mapSecretToImageBuilds()
+		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+		defer queue.ShutDown()
+
+		handler.Create(ctx, event.CreateEvent{Object: secret}, queue)
+
+		require.Equal(t, 1, queue.Len())
+		req, _ := queue.Get()
+		queue.Done(req)
+		require.Equal(t, namespace+"/"+imageBuildName, req.NamespacedName.String(), "expected ImageBuild to be enqueued")
+	})
 }
