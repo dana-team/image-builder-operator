@@ -17,41 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func newClient(t *testing.T, objs ...client.Object) client.Client {
-	t.Helper()
-	s := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(s))
-	require.NoError(t, buildv1alpha1.AddToScheme(s))
-	require.NoError(t, shipwright.AddToScheme(s))
-	return fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
-		WithObjects(objs...).
-		Build()
-}
-
-func newOnCommitImageBuild(url, revision string) *buildv1alpha1.ImageBuild {
-	return &buildv1alpha1.ImageBuild{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ib",
-			Namespace: "ns",
-			Labels:    map[string]string{"build.dana.io/oncommit-enabled": "true"},
-		},
-		Spec: buildv1alpha1.ImageBuildSpec{
-			OnCommit: &buildv1alpha1.ImageBuildOnCommit{
-				WebhookSecretRef: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "wh"},
-					Key:                  "k",
-				},
-			},
-			Source:    buildv1alpha1.ImageBuildSource{Type: buildv1alpha1.ImageBuildSourceTypeGit, Git: buildv1alpha1.ImageBuildGitSource{URL: url, Revision: revision}},
-			BuildFile: buildv1alpha1.ImageBuildFile{Mode: buildv1alpha1.ImageBuildFileModeAbsent},
-			Output:    buildv1alpha1.ImageBuildOutput{Image: "registry.example.com/team/app:v1"},
-			Rebuild:   &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
-		},
-	}
-}
-
 func TestServeHTTP(t *testing.T) {
 	t.Run("no match", func(t *testing.T) {
 		c := newClient(t)
@@ -89,4 +54,39 @@ func TestServeHTTP(t *testing.T) {
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
 		require.Equal(t, http.StatusBadRequest, rr.Code)
 	})
+}
+
+func newClient(t *testing.T, objs ...client.Object) client.Client {
+	t.Helper()
+	s := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, buildv1alpha1.AddToScheme(s))
+	require.NoError(t, shipwright.AddToScheme(s))
+	return fake.NewClientBuilder().
+		WithScheme(s).
+		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
+		WithObjects(objs...).
+		Build()
+}
+
+func newOnCommitImageBuild(url, revision string) *buildv1alpha1.ImageBuild {
+	return &buildv1alpha1.ImageBuild{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ib",
+			Namespace: "ns",
+			Labels:    map[string]string{"build.dana.io/oncommit-enabled": "true"},
+		},
+		Spec: buildv1alpha1.ImageBuildSpec{
+			OnCommit: &buildv1alpha1.ImageBuildOnCommit{
+				WebhookSecretRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "wh"},
+					Key:                  "k",
+				},
+			},
+			Source:    buildv1alpha1.ImageBuildSource{Type: buildv1alpha1.ImageBuildSourceTypeGit, Git: buildv1alpha1.ImageBuildGitSource{URL: url, Revision: revision}},
+			BuildFile: buildv1alpha1.ImageBuildFile{Mode: buildv1alpha1.ImageBuildFileModeAbsent},
+			Output:    buildv1alpha1.ImageBuildOutput{Image: "registry.example.com/team/app:v1"},
+			Rebuild:   &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
+		},
+	}
 }
