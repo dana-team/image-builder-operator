@@ -111,7 +111,7 @@ func TestReconcileBuild(t *testing.T) {
 				Output:   shipwright.Image{Image: ib.Spec.Output.Image},
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuild, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuild, newScheme(t)))
 
 		r, c := newReconciler(t, ib, strategy, existingBuild)
 
@@ -142,7 +142,7 @@ func TestReconcileBuild(t *testing.T) {
 				Output:   shipwright.Image{Image: ib.Spec.Output.Image},
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuild, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuild, newScheme(t)))
 
 		r, c := newReconciler(t, ib, strategy, existingBuild)
 
@@ -174,7 +174,7 @@ func TestReconcileBuild(t *testing.T) {
 				Namespace: ib.Namespace,
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflictingBuild, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflictingBuild, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, strategy, conflictingBuild)
 

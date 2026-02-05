@@ -47,7 +47,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		existingBuildRun := newBuildRun(ib, 1)
 		existingBuildRun.UID = types.UID("existing-buildrun-uid")
 
-		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuildRun, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuildRun, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, existingBuildRun)
 		br, err := r.reconcileBuildRun(ctx, ib)
@@ -67,7 +67,7 @@ func TestReconcileBuildRun(t *testing.T) {
 				UID:  types.UID("other-uid"),
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
 		br, err := r.reconcileBuildRun(ctx, ib)

@@ -61,7 +61,7 @@ func TestReconcileRebuild(t *testing.T) {
 		activeBR := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{Name: activeBuildRunName, Namespace: ib.Namespace},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, activeBR, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, activeBR, newScheme(t)))
 
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, activeBR)
@@ -156,7 +156,7 @@ func TestReconcileRebuild(t *testing.T) {
 		doneBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{Name: doneBuildRunName, Namespace: ib.Namespace},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, doneBuildRun, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, doneBuildRun, newScheme(t)))
 		doneBuildRun.Status.Conditions = append(doneBuildRun.Status.Conditions, shipwright.Condition{
 			Type:   shipwright.Succeeded,
 			Status: corev1.ConditionTrue,
@@ -183,7 +183,7 @@ func TestReconcileRebuild(t *testing.T) {
 		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{Name: failedBuildRunName, Namespace: ib.Namespace},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, failedBuildRun, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, failedBuildRun, newScheme(t)))
 		failedBuildRun.Status.Conditions = append(failedBuildRun.Status.Conditions, shipwright.Condition{
 			Type:   shipwright.Succeeded,
 			Status: corev1.ConditionFalse,
@@ -235,7 +235,7 @@ func TestReconcileRebuild(t *testing.T) {
 				UID:       types.UID("other-uid"),
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, testScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
 		br, requeue, err := r.reconcileRebuild(ctx, ib)

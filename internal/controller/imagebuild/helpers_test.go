@@ -17,7 +17,7 @@ import (
 
 const absentStrategy = "absent-strategy"
 
-func testScheme(t *testing.T) *runtime.Scheme {
+func newScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 
 	s := runtime.NewScheme()
@@ -30,7 +30,7 @@ func testScheme(t *testing.T) *runtime.Scheme {
 func newReconciler(t *testing.T, objs ...client.Object) (*ImageBuildReconciler, client.Client) {
 	t.Helper()
 
-	s := testScheme(t)
+	s := newScheme(t)
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
@@ -95,7 +95,7 @@ func requireCondition(
 func newClientWithSecretIndexes(t *testing.T, objects ...client.Object) client.Client {
 	t.Helper()
 
-	scheme := testScheme(t)
+	scheme := newScheme(t)
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).

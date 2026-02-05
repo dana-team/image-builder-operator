@@ -182,7 +182,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 
 	t.Run("ignores secrets not referenced by any ImageBuild", func(t *testing.T) {
 		c := newClientWithSecretIndexes(t)
-		r := &ImageBuildReconciler{Client: c, Scheme: testScheme(t)}
+		r := &ImageBuildReconciler{Client: c, Scheme: newScheme(t)}
 		handler := r.mapSecretToImageBuilds()
 		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 		defer queue.ShutDown()
@@ -214,7 +214,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
 
 		c := newClientWithSecretIndexes(t, secret, ibPush)
-		r := &ImageBuildReconciler{Client: c, Scheme: testScheme(t)}
+		r := &ImageBuildReconciler{Client: c, Scheme: newScheme(t)}
 		handler := r.mapSecretToImageBuilds()
 		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 		defer queue.ShutDown()
@@ -224,6 +224,6 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		require.Equal(t, 1, queue.Len())
 		req, _ := queue.Get()
 		queue.Done(req)
-		require.Equal(t, namespace+"/"+imageBuildName, req.NamespacedName.String(), "expected ImageBuild to be enqueued")
+		require.Equal(t, namespace+"/"+imageBuildName, req.String(), "expected ImageBuild to be enqueued")
 	})
 }
