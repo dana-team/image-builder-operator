@@ -15,7 +15,7 @@ import (
 )
 
 func TestGitLabSuccess(t *testing.T) {
-	ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git", "main")
+	ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git")
 	c := newClient(t,
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: []byte("token")}},
 		ib,
