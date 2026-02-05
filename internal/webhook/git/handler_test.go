@@ -17,13 +17,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	refHeadsMain      = "refs/heads/main"
+	webhookPath       = "/webhooks/git"
+	webhookSecretName = "webhook-secret"
+	webhookSecretKey  = "token"
+)
+
 func TestServeHTTP(t *testing.T) {
 	t.Run("no match", func(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		body := `{"ref":"refs/heads/main","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
-		req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
+		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
+		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -36,7 +43,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodGet, "/webhooks/git", nil)
+		req := httptest.NewRequest(http.MethodGet, webhookPath, nil)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -47,8 +54,8 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		body := `{"ref":"refs/heads/main","after":"abc","repository":{"html_url":"https://example.com/repo"}}`
-		req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
+		body := `{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://example.com/repo"}}`
+		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -79,8 +86,8 @@ func newOnCommitImageBuild(url, revision string) *buildv1alpha1.ImageBuild {
 		Spec: buildv1alpha1.ImageBuildSpec{
 			OnCommit: &buildv1alpha1.ImageBuildOnCommit{
 				WebhookSecretRef: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "wh"},
-					Key:                  "k",
+					LocalObjectReference: corev1.LocalObjectReference{Name: webhookSecretName},
+					Key:                  webhookSecretKey,
 				},
 			},
 			Source:    buildv1alpha1.ImageBuildSource{Type: buildv1alpha1.ImageBuildSourceTypeGit, Git: buildv1alpha1.ImageBuildGitSource{URL: url, Revision: revision}},

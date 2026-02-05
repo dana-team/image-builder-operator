@@ -20,17 +20,17 @@ func TestGitHubSuccess(t *testing.T) {
 	secret := []byte("s3cr3t")
 	ib := newOnCommitImageBuild("https://github.com/org/repo", "main")
 	c := newClient(t,
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "wh", Namespace: ib.Namespace}, Data: map[string][]byte{"k": secret}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: secret}},
 		ib,
 	)
 	h := &Handler{Client: c}
 
-	body := []byte(`{"ref":"refs/heads/main","after":"abc","repository":{"html_url":"https://github.com/org/repo"}}`)
+	body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://github.com/org/repo"}}`)
 	mac := hmac.New(sha256.New, secret)
 	mac.Write(body)
 	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(github.EventTypeHeader, "push")
 	req.Header.Set(github.SHA256SignatureHeader, sig)

@@ -17,13 +17,13 @@ import (
 func TestGitLabSuccess(t *testing.T) {
 	ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git", "main")
 	c := newClient(t,
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "wh", Namespace: ib.Namespace}, Data: map[string][]byte{"k": []byte("token")}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: []byte("token")}},
 		ib,
 	)
 	h := &Handler{Client: c}
 
-	body := `{"ref":"refs/heads/main","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
+	body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
+	req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
 	req.Header.Set(headerGitlabEvent, "Push Hook")
 	req.Header.Set(headerGitlabToken, "token")
 	rr := httptest.NewRecorder()
