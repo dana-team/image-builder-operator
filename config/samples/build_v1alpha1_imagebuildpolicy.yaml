@@ -1,0 +1,9 @@
+apiVersion: build.dana.io/v1alpha1
+kind: ImageBuildPolicy
+metadata:
+  name: imagebuildpolicy-sample
+spec:
+  clusterBuildStrategy:
+    buildFile:
+      present: buildpacks-v3
+      absent: source-to-image

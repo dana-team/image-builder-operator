@@ -1,0 +1,78 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: imagebuildpolicies.build.dana.io
+spec:
+  group: build.dana.io
+  names:
+    kind: ImageBuildPolicy
+    listKind: ImageBuildPolicyList
+    plural: imagebuildpolicies
+    shortNames:
+    - ibp
+    singular: imagebuildpolicy
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ImageBuildPolicy is the Schema for the ImageBuildPolicies API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ImageBuildPolicySpec defines the desired state of an ImageBuildPolicy.
+            properties:
+              clusterBuildStrategy:
+                description: ClusterBuildStrategy holds platform defaults for selecting
+                  a build strategy.
+                properties:
+                  buildFile:
+                    description: |-
+                      BuildFile holds strategy defaults for selecting a strategy based on whether a
+                      build file indicator is present (e.g. Dockerfile, Containerfile).
+                    properties:
+                      absent:
+                        description: Absent is the strategy name to use when the source
+                          does not indicate a file-based build.
+                        minLength: 1
+                        type: string
+                      present:
+                        description: Present is the strategy name to use when the
+                          source indicates a file-based build.
+                        minLength: 1
+                        type: string
+                    required:
+                    - absent
+                    - present
+                    type: object
+                required:
+                - buildFile
+                type: object
+            required:
+            - clusterBuildStrategy
+            type: object
+          status:
+            description: ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy.
+            type: object
+        type: object
+    served: true
+    storage: true

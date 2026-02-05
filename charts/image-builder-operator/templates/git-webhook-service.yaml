@@ -1,0 +1,16 @@
+{{- if .Values.onCommit.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-builder-operator.fullname" . }}-git-webhook-service
+  labels:
+  {{- include "image-builder-operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    control-plane: controller-manager
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+{{- end }}

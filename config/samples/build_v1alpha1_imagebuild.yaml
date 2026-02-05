@@ -1,0 +1,29 @@
+apiVersion: build.dana.io/v1alpha1
+kind: ImageBuild
+metadata:
+  name: imagebuild-sample
+  namespace: default
+spec:
+  buildFile:
+    mode: Present
+  source:
+    type: Git
+    contextDir: app
+    git:
+      url: https://github.com/example/my-app.git
+      revision: main
+      cloneSecret:
+        name: git-credentials
+
+  rebuild:
+    mode: OnCommit
+
+  output:
+    image: docker.io/myorg/my-app:latest
+    pushSecret:
+      name: registry-credentials
+
+  onCommit:
+    webhookSecretRef:
+      name: webhook-secret
+      key: token
