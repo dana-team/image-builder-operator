@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func testClient(t *testing.T, objs ...client.Object) client.Client {
+func newClient(t *testing.T, objs ...client.Object) client.Client {
 	t.Helper()
 	s := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(s))
@@ -52,16 +52,41 @@ func newOnCommitImageBuild(url, revision string) *buildv1alpha1.ImageBuild {
 	}
 }
 
-func TestWebhookNoMatch(t *testing.T) {
-	c := testClient(t)
-	h := &Handler{Client: c}
+func TestServeHTTP(t *testing.T) {
+	t.Run("no match", func(t *testing.T) {
+		c := newClient(t)
+		h := &Handler{Client: c}
 
-	body := `{"ref":"refs/heads/main","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
-	req.Header.Set(headerGitlabEvent, "Push Hook")
-	req.Header.Set(headerGitlabToken, "any")
-	rr := httptest.NewRecorder()
+		body := `{"ref":"refs/heads/main","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
+		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req.Header.Set(headerGitlabToken, "any")
+		rr := httptest.NewRecorder()
 
-	h.ServeHTTP(rr, req.WithContext(context.Background()))
-	require.Equal(t, http.StatusAccepted, rr.Code)
+		h.ServeHTTP(rr, req.WithContext(context.Background()))
+		require.Equal(t, http.StatusAccepted, rr.Code)
+	})
+
+	t.Run("rejects non-POST", func(t *testing.T) {
+		c := newClient(t)
+		h := &Handler{Client: c}
+
+		req := httptest.NewRequest(http.MethodGet, "/webhooks/git", nil)
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req.WithContext(context.Background()))
+		require.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+
+	t.Run("rejects unsupported provider", func(t *testing.T) {
+		c := newClient(t)
+		h := &Handler{Client: c}
+
+		body := `{"ref":"refs/heads/main","after":"abc","repository":{"html_url":"https://example.com/repo"}}`
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/git", bytes.NewBufferString(body))
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req.WithContext(context.Background()))
+		require.Equal(t, http.StatusBadRequest, rr.Code)
+	})
 }

@@ -19,7 +19,7 @@ import (
 func TestGitHubSuccess(t *testing.T) {
 	secret := []byte("s3cr3t")
 	ib := newOnCommitImageBuild("https://github.com/org/repo", "main")
-	c := testClient(t,
+	c := newClient(t,
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "wh", Namespace: ib.Namespace}, Data: map[string][]byte{"k": secret}},
 		ib,
 	)

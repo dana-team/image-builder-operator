@@ -16,7 +16,7 @@ import (
 
 func TestGitLabSuccess(t *testing.T) {
 	ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git", "main")
-	c := testClient(t,
+	c := newClient(t,
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "wh", Namespace: ib.Namespace}, Data: map[string][]byte{"k": []byte("token")}},
 		ib,
 	)
