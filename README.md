@@ -99,7 +99,7 @@ spec:
 
 ### Automatic rebuilds on commit
 
-See `docs/git-webhook.md` for Git provider webhook setup.
+See [Git webhook user guide](docs/git-webhook.md) for Git provider webhook setup.
 
 ## Development
 
