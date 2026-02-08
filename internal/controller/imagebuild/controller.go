@@ -97,6 +97,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// secretWatchPredicate returns a predicate that only accepts Secret create
+// events, so that a newly available secret can trigger a retry for failed builds.
 func (r *Reconciler) secretWatchPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -114,6 +116,8 @@ func (r *Reconciler) secretWatchPredicate() predicate.Predicate {
 	}
 }
 
+// mapSecretToImageBuilds returns an event handler that enqueues reconcile
+// requests for every ImageBuild referencing the Secret.
 func (r *Reconciler) mapSecretToImageBuilds() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		secret, ok := obj.(*corev1.Secret)
@@ -254,6 +258,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
+// ensureBuildRun creates a new BuildRun when the spec has changed,
+// or returns the existing one otherwise.
 func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,

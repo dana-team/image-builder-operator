@@ -92,6 +92,8 @@ func nextBuildRunCounter(ib *buildv1alpha1.ImageBuild) int64 {
 	return counter + 1
 }
 
+// deriveBuildSucceededStatus maps the Shipwright BuildRun's Succeeded condition
+// to an ImageBuild-level (status, reason, message) tuple.
 func deriveBuildSucceededStatus(br *shipwright.BuildRun) (metav1.ConditionStatus, string, string) {
 	succeededCondition := br.Status.GetCondition(shipwright.Succeeded)
 	if succeededCondition == nil {
@@ -127,6 +129,8 @@ func hasTagOrDigest(image string) bool {
 	return !distref.IsNameOnly(parsed)
 }
 
+// computeLatestImage returns the image reference for a successful BuildRun,
+// preferring digest over tag; returns empty if neither is available.
 func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) string {
 	if br.Status.Output != nil && br.Status.Output.Digest != "" {
 		return ib.Spec.Output.Image + "@" + br.Status.Output.Digest
@@ -174,6 +178,8 @@ func (r *Reconciler) patchLatestImage(
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
+// isNewBuildRequired reports whether a new BuildRun should be created,
+// based on spec drift, missing prior runs, or a secret-retry condition.
 func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
@@ -208,6 +214,8 @@ func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.I
 	return false
 }
 
+// recordBuildSpec snapshots the build-relevant spec fields
+// for detecting spec drift on subsequent reconciles.
 func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 	if ib.Annotations == nil {
 		ib.Annotations = make(map[string]string)
@@ -228,6 +236,8 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 	return nil
 }
 
+// needsSecretRetry reports whether the last BuildRun failed due to a missing
+// secret that has since become available.
 func (r *Reconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 

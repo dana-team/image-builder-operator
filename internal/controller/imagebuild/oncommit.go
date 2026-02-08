@@ -18,6 +18,8 @@ const (
 	onCommitMinInterval = 30 * time.Second
 )
 
+// reconcileRebuild handles the on-commit rebuild flow: debounce, duplicate
+// commit detection, active-run check, and BuildRun creation.
 func (r *Reconciler) reconcileRebuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
@@ -104,6 +106,7 @@ func (r *Reconciler) getActiveBuildRun(
 	return nil, nil
 }
 
+// isActiveBuildRun reports whether the BuildRun is still in progress.
 func isActiveBuildRun(br *shipwright.BuildRun) bool {
 	cond := br.Status.GetCondition(shipwright.Succeeded)
 	if cond == nil {
@@ -147,6 +150,8 @@ func (r *Reconciler) createBuildRun(
 	return br, nil, nil
 }
 
+// requeueAfter returns the remaining wait time if the pending commit is still
+// within the debounce window or the minimum interval since the last trigger.
 func requeueAfter(ib *buildv1alpha1.ImageBuild) *time.Duration {
 	receivedAt := ib.Status.OnCommit.Pending.ReceivedAt.Time
 	if !receivedAt.IsZero() {
