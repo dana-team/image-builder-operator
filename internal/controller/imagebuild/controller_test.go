@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -175,6 +176,69 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 	latest := &buildv1alpha1.ImageBuild{}
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 	return latest
+}
+
+func TestEnsureBuildRun(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("reports not ready when BuildRun owned by another ImageBuild", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+
+		otherOwner := &buildv1alpha1.ImageBuild{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "someone-else",
+				Namespace: ib.Namespace,
+				UID:       types.UID("other-uid"),
+			},
+		}
+		conflictingBuildRun := newBuildRun(ib, nextBuildRunCounter(ib))
+		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflictingBuildRun, newScheme(t)))
+
+		r, c := newReconciler(t, ib, conflictingBuildRun)
+
+		br, result, err := r.ensureBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Zero(t, result.RequeueAfter)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunConflict)
+	})
+
+	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.LastBuildRunRef = "existing-br"
+
+		lastBuildRun := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "existing-br",
+				Namespace: ib.Namespace,
+			},
+		}
+
+		r, _ := newReconciler(t, ib, lastBuildRun)
+		require.NoError(t, r.recordBuildSpec(ib))
+
+		br, result, err := r.ensureBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, result)
+		require.NotNil(t, br)
+		require.Equal(t, lastBuildRun.Name, br.Name)
+	})
+
+	t.Run("tolerates deleted BuildRun gracefully", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.LastBuildRunRef = "deleted-br"
+
+		r, _ := newReconciler(t, ib)
+		require.NoError(t, r.recordBuildSpec(ib))
+
+		br, result, err := r.ensureBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, result)
+		require.Nil(t, br)
+	})
 }
 
 func TestMapSecretToImageBuilds(t *testing.T) {
