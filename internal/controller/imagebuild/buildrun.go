@@ -27,29 +27,6 @@ type buildInputs struct {
 	Output    buildv1alpha1.ImageBuildOutput `json:"output"`
 }
 
-func buildRunNameFor(ib *buildv1alpha1.ImageBuild, counter int64) string {
-	return fmt.Sprintf("%s-buildrun-%d", ib.Name, counter)
-}
-
-func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildRun {
-	buildName := buildNameFor(ib)
-
-	return &shipwright.BuildRun{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      buildRunNameFor(ib, counter),
-			Namespace: ib.Namespace,
-			Labels: map[string]string{
-				labelKeyParentImageBuild: ib.Name,
-			},
-		},
-		Spec: shipwright.BuildRunSpec{
-			Build: shipwright.ReferencedBuild{
-				Name: &buildName,
-			},
-		},
-	}
-}
-
 func (r *Reconciler) reconcileBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
@@ -82,63 +59,6 @@ func (r *Reconciler) reconcileBuildRun(
 	}
 
 	return desired, nil
-}
-
-func nextBuildRunCounter(ib *buildv1alpha1.ImageBuild) int64 {
-	counter := ib.Status.BuildRunCounter
-	if counter < 0 {
-		counter = 0
-	}
-	return counter + 1
-}
-
-// deriveBuildSucceededStatus maps the Shipwright BuildRun's Succeeded condition
-// to an ImageBuild-level (status, reason, message) tuple.
-func deriveBuildSucceededStatus(br *shipwright.BuildRun) (metav1.ConditionStatus, string, string) {
-	succeededCondition := br.Status.GetCondition(shipwright.Succeeded)
-	if succeededCondition == nil {
-		return metav1.ConditionUnknown, ReasonBuildRunPending, "BuildRun has not reported status yet"
-	}
-
-	switch succeededCondition.GetStatus() {
-	case corev1.ConditionTrue:
-		return metav1.ConditionTrue, ReasonBuildRunSucceeded, "BuildRun succeeded"
-	case corev1.ConditionFalse:
-		msg := "BuildRun failed"
-		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
-			msg = fmt.Sprintf("BuildRun failed: %s", buildRunMessage)
-		}
-		return metav1.ConditionFalse, ReasonBuildRunFailed, strings.TrimSpace(msg)
-	default:
-		msg := "BuildRun is running"
-		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
-			msg = fmt.Sprintf("BuildRun is running: %s", buildRunMessage)
-		}
-		return metav1.ConditionUnknown, ReasonBuildRunRunning, strings.TrimSpace(msg)
-	}
-}
-
-func hasTagOrDigest(image string) bool {
-	parsed, err := distref.ParseNormalizedNamed(image)
-	if err != nil {
-		return false
-	}
-	if _, ok := parsed.(distref.Digested); ok {
-		return true
-	}
-	return !distref.IsNameOnly(parsed)
-}
-
-// computeLatestImage returns the image reference for a successful BuildRun,
-// preferring digest over tag; returns empty if neither is available.
-func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) string {
-	if br.Status.Output != nil && br.Status.Output.Digest != "" {
-		return ib.Spec.Output.Image + "@" + br.Status.Output.Digest
-	}
-	if hasTagOrDigest(ib.Spec.Output.Image) {
-		return ib.Spec.Output.Image
-	}
-	return ""
 }
 
 func (r *Reconciler) patchBuildSucceededCondition(
@@ -278,4 +198,84 @@ func (r *Reconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.Ima
 	}
 
 	return false
+}
+
+// deriveBuildSucceededStatus maps the Shipwright BuildRun's Succeeded condition
+// to an ImageBuild-level (status, reason, message) tuple.
+func deriveBuildSucceededStatus(br *shipwright.BuildRun) (metav1.ConditionStatus, string, string) {
+	succeededCondition := br.Status.GetCondition(shipwright.Succeeded)
+	if succeededCondition == nil {
+		return metav1.ConditionUnknown, ReasonBuildRunPending, "BuildRun has not reported status yet"
+	}
+
+	switch succeededCondition.GetStatus() {
+	case corev1.ConditionTrue:
+		return metav1.ConditionTrue, ReasonBuildRunSucceeded, "BuildRun succeeded"
+	case corev1.ConditionFalse:
+		msg := "BuildRun failed"
+		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
+			msg = fmt.Sprintf("BuildRun failed: %s", buildRunMessage)
+		}
+		return metav1.ConditionFalse, ReasonBuildRunFailed, strings.TrimSpace(msg)
+	default:
+		msg := "BuildRun is running"
+		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
+			msg = fmt.Sprintf("BuildRun is running: %s", buildRunMessage)
+		}
+		return metav1.ConditionUnknown, ReasonBuildRunRunning, strings.TrimSpace(msg)
+	}
+}
+
+// computeLatestImage returns the image reference for a successful BuildRun,
+// preferring digest over tag; returns empty if neither is available.
+func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) string {
+	if br.Status.Output != nil && br.Status.Output.Digest != "" {
+		return ib.Spec.Output.Image + "@" + br.Status.Output.Digest
+	}
+	if hasTagOrDigest(ib.Spec.Output.Image) {
+		return ib.Spec.Output.Image
+	}
+	return ""
+}
+
+func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildRun {
+	buildName := buildNameFor(ib)
+
+	return &shipwright.BuildRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      buildRunNameFor(ib, counter),
+			Namespace: ib.Namespace,
+			Labels: map[string]string{
+				labelKeyParentImageBuild: ib.Name,
+			},
+		},
+		Spec: shipwright.BuildRunSpec{
+			Build: shipwright.ReferencedBuild{
+				Name: &buildName,
+			},
+		},
+	}
+}
+
+func buildRunNameFor(ib *buildv1alpha1.ImageBuild, counter int64) string {
+	return fmt.Sprintf("%s-buildrun-%d", ib.Name, counter)
+}
+
+func nextBuildRunCounter(ib *buildv1alpha1.ImageBuild) int64 {
+	counter := ib.Status.BuildRunCounter
+	if counter < 0 {
+		counter = 0
+	}
+	return counter + 1
+}
+
+func hasTagOrDigest(image string) bool {
+	parsed, err := distref.ParseNormalizedNamed(image)
+	if err != nil {
+		return false
+	}
+	if _, ok := parsed.(distref.Digested); ok {
+		return true
+	}
+	return !distref.IsNameOnly(parsed)
 }

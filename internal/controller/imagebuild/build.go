@@ -15,29 +15,49 @@ import (
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 )
 
-func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
-	return ib.Name + "-build"
-}
-
-func (r *Reconciler) patchReadyCondition(
+// reconcileBuild ensures the Shipwright Build exists and matches desired state.
+func (r *Reconciler) reconcileBuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
-	status metav1.ConditionStatus,
-	reason, message string,
+	selectedStrategyName string,
 ) error {
-	orig := ib.DeepCopy()
+	logger := log.FromContext(ctx)
 
-	ib.Status.ObservedGeneration = ib.Generation
+	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
+	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
+		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", selectedStrategyName, err)
+	}
 
-	meta.SetStatusCondition(&ib.Status.Conditions, metav1.Condition{
-		Type:               TypeReady,
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: ib.Generation,
+	desired := r.newBuild(ib, selectedStrategyName)
+
+	actual := &shipwright.Build{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      desired.Name,
+			Namespace: desired.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrPatch(ctx, r.Client, actual, func() error {
+		if err := controllerutil.SetControllerReference(ib, actual, r.Scheme); err != nil {
+			return err
+		}
+		if actual.Labels == nil {
+			actual.Labels = make(map[string]string, len(desired.Labels))
+		}
+		for k, v := range desired.Labels {
+			actual.Labels[k] = v
+		}
+		actual.Spec = desired.Spec
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if op != controllerutil.OperationResultNone {
+		logger.Info("Reconciled Shipwright Build", "name", actual.Name, "operation", string(op))
+	}
 
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+	return nil
 }
 
 func (r *Reconciler) newBuild(
@@ -91,47 +111,27 @@ func (r *Reconciler) newBuild(
 	return build
 }
 
-// reconcileBuild ensures the Shipwright Build exists and matches desired state.
-func (r *Reconciler) reconcileBuild(
+func (r *Reconciler) patchReadyCondition(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
-	selectedStrategyName string,
+	status metav1.ConditionStatus,
+	reason, message string,
 ) error {
-	logger := log.FromContext(ctx)
+	orig := ib.DeepCopy()
 
-	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
-	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
-		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", selectedStrategyName, err)
-	}
+	ib.Status.ObservedGeneration = ib.Generation
 
-	desired := r.newBuild(ib, selectedStrategyName)
-
-	actual := &shipwright.Build{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      desired.Name,
-			Namespace: desired.Namespace,
-		},
-	}
-
-	op, err := controllerutil.CreateOrPatch(ctx, r.Client, actual, func() error {
-		if err := controllerutil.SetControllerReference(ib, actual, r.Scheme); err != nil {
-			return err
-		}
-		if actual.Labels == nil {
-			actual.Labels = make(map[string]string, len(desired.Labels))
-		}
-		for k, v := range desired.Labels {
-			actual.Labels[k] = v
-		}
-		actual.Spec = desired.Spec
-		return nil
+	meta.SetStatusCondition(&ib.Status.Conditions, metav1.Condition{
+		Type:               TypeReady,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: ib.Generation,
 	})
-	if err != nil {
-		return err
-	}
-	if op != controllerutil.OperationResultNone {
-		logger.Info("Reconciled Shipwright Build", "name", actual.Name, "operation", string(op))
-	}
 
-	return nil
+	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+}
+
+func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
+	return ib.Name + "-build"
 }

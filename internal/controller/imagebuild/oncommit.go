@@ -73,6 +73,26 @@ func isRebuildEnabled(ib *buildv1alpha1.ImageBuild) bool {
 		ib.Status.OnCommit.Pending != nil
 }
 
+// requeueAfter returns the remaining wait time if the pending commit is still
+// within the debounce window or the minimum interval since the last trigger.
+func requeueAfter(ib *buildv1alpha1.ImageBuild) *time.Duration {
+	receivedAt := ib.Status.OnCommit.Pending.ReceivedAt.Time
+	if !receivedAt.IsZero() {
+		if remaining := time.Until(receivedAt.Add(onCommitDebounce)); remaining > 0 {
+			return &remaining
+		}
+	}
+
+	if ib.Status.OnCommit.LastTriggeredBuildRun != nil && !ib.Status.OnCommit.LastTriggeredBuildRun.TriggeredAt.IsZero() {
+		last := ib.Status.OnCommit.LastTriggeredBuildRun.TriggeredAt.Time
+		if remaining := time.Until(last.Add(onCommitMinInterval)); remaining > 0 {
+			return &remaining
+		}
+	}
+
+	return nil
+}
+
 func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
 	if ib.Status.OnCommit.LastTriggeredBuildRun == nil {
 		return false
@@ -148,26 +168,6 @@ func (r *Reconciler) createBuildRun(
 	}
 
 	return br, nil, nil
-}
-
-// requeueAfter returns the remaining wait time if the pending commit is still
-// within the debounce window or the minimum interval since the last trigger.
-func requeueAfter(ib *buildv1alpha1.ImageBuild) *time.Duration {
-	receivedAt := ib.Status.OnCommit.Pending.ReceivedAt.Time
-	if !receivedAt.IsZero() {
-		if remaining := time.Until(receivedAt.Add(onCommitDebounce)); remaining > 0 {
-			return &remaining
-		}
-	}
-
-	if ib.Status.OnCommit.LastTriggeredBuildRun != nil && !ib.Status.OnCommit.LastTriggeredBuildRun.TriggeredAt.IsZero() {
-		last := ib.Status.OnCommit.LastTriggeredBuildRun.TriggeredAt.Time
-		if remaining := time.Until(last.Add(onCommitMinInterval)); remaining > 0 {
-			return &remaining
-		}
-	}
-
-	return nil
 }
 
 func nextTriggerCounter(ib *buildv1alpha1.ImageBuild) int64 {
