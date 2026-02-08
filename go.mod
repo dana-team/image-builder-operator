@@ -1,6 +1,6 @@
 module github.com/dana-team/image-builder-operator
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/distribution/reference v0.6.0
