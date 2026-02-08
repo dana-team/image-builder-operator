@@ -1,5 +1,6 @@
 package imagebuild
 
+// Condition types and reasons used in ImageBuild status conditions.
 const (
 	TypeReady          = "Ready"
 	TypeBuildSucceeded = "BuildSucceeded"

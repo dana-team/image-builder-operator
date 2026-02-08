@@ -29,7 +29,7 @@ import (
 
 const (
 	imageBuildControllerName = "ImageBuildController"
-	ImageBuildPolicyName     = "image-build-policy"
+	imageBuildPolicyName     = "image-build-policy"
 
 	indexPushSecret    = "pushSecret"
 	indexCloneSecret   = "cloneSecret"
@@ -166,7 +166,7 @@ func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	var alreadyOwned *controllerutil.AlreadyOwnedError
 
 	policy := &buildv1alpha1.ImageBuildPolicy{}
-	if err := r.Get(ctx, client.ObjectKey{Name: ImageBuildPolicyName}, policy); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: imageBuildPolicyName}, policy); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
