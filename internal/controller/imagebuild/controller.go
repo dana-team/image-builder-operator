@@ -36,6 +36,7 @@ const (
 	indexWebhookSecret = "webhookSecret"
 )
 
+// ImageBuildReconciler reconciles ImageBuild resources.
 type ImageBuildReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
@@ -53,6 +54,7 @@ type ImageBuildReconciler struct {
 // +kubebuilder:rbac:groups=shipwright.io,resources=buildruns,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
+// SetupWithManager registers the controller and its watches with the given manager.
 func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctx := context.Background()
 
@@ -143,6 +145,7 @@ func (r *ImageBuildReconciler) mapSecretToImageBuilds() handler.EventHandler {
 	})
 }
 
+// Reconcile reconciles the desired state of an ImageBuild with the cluster state.
 func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ImageBuildName", req.Name, "ImageBuildNamespace", req.Namespace)
 	logger.Info("Starting Reconcile")
