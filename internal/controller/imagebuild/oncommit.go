@@ -121,7 +121,7 @@ func (r *Reconciler) createBuildRun(
 	ib *buildv1alpha1.ImageBuild,
 	commitSHA string,
 ) (*shipwright.BuildRun, *time.Duration, error) {
-	counter := nextTrigger(ib)
+	counter := nextTriggerCounter(ib)
 	br := newBuildRun(ib, counter)
 	br.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
 	br.Labels[labelKeyBuildTrigger] = "oncommit"
@@ -170,7 +170,7 @@ func requeueAfter(ib *buildv1alpha1.ImageBuild) *time.Duration {
 	return nil
 }
 
-func nextTrigger(ib *buildv1alpha1.ImageBuild) int64 {
+func nextTriggerCounter(ib *buildv1alpha1.ImageBuild) int64 {
 	counter := ib.Status.OnCommit.TriggerCounter
 	if counter < 0 {
 		counter = 0
