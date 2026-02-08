@@ -27,7 +27,7 @@ func newScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
-func newReconciler(t *testing.T, objs ...client.Object) (*ImageBuildReconciler, client.Client) {
+func newReconciler(t *testing.T, objs ...client.Object) (*Reconciler, client.Client) {
 	t.Helper()
 
 	s := newScheme(t)
@@ -37,7 +37,7 @@ func newReconciler(t *testing.T, objs ...client.Object) (*ImageBuildReconciler, 
 		WithObjects(objs...).
 		Build()
 
-	return &ImageBuildReconciler{
+	return &Reconciler{
 		Client: c,
 		Scheme: s,
 	}, c

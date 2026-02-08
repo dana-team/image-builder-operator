@@ -52,7 +52,7 @@ func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildR
 	}
 }
 
-func (r *ImageBuildReconciler) reconcileBuildRun(
+func (r *Reconciler) reconcileBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
@@ -139,7 +139,7 @@ func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) s
 	return ""
 }
 
-func (r *ImageBuildReconciler) patchBuildSucceededCondition(
+func (r *Reconciler) patchBuildSucceededCondition(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	br *shipwright.BuildRun,
@@ -161,7 +161,7 @@ func (r *ImageBuildReconciler) patchBuildSucceededCondition(
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) patchLatestImage(
+func (r *Reconciler) patchLatestImage(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	latestImage string,
@@ -176,7 +176,7 @@ func (r *ImageBuildReconciler) patchLatestImage(
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
 	if ib.Status.LastBuildRunRef == "" {
@@ -210,7 +210,7 @@ func (r *ImageBuildReconciler) isNewBuildRequired(ctx context.Context, ib *build
 	return false
 }
 
-func (r *ImageBuildReconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 	if ib.Annotations == nil {
 		ib.Annotations = make(map[string]string)
 	}
@@ -230,7 +230,7 @@ func (r *ImageBuildReconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) err
 	return nil
 }
 
-func (r *ImageBuildReconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+func (r *Reconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
 	lastBR := &shipwright.BuildRun{}

@@ -169,7 +169,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&imagebuildcontroller.ImageBuildReconciler{
+	if err := (&imagebuildcontroller.Reconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetEventRecorderFor("imagebuild-controller"),

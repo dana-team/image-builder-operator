@@ -19,7 +19,7 @@ func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
 	return ib.Name + "-build"
 }
 
-func (r *ImageBuildReconciler) patchReadyCondition(
+func (r *Reconciler) patchReadyCondition(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	status metav1.ConditionStatus,
@@ -40,7 +40,7 @@ func (r *ImageBuildReconciler) patchReadyCondition(
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) newBuild(
+func (r *Reconciler) newBuild(
 	ib *buildv1alpha1.ImageBuild,
 	selectedStrategyName string,
 ) *shipwright.Build {
@@ -92,7 +92,7 @@ func (r *ImageBuildReconciler) newBuild(
 }
 
 // reconcileBuild ensures the Shipwright Build exists and matches desired state.
-func (r *ImageBuildReconciler) reconcileBuild(
+func (r *Reconciler) reconcileBuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	selectedStrategyName string,

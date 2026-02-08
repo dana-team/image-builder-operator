@@ -36,8 +36,8 @@ const (
 	indexWebhookSecret = "webhookSecret"
 )
 
-// ImageBuildReconciler reconciles ImageBuild resources.
-type ImageBuildReconciler struct {
+// Reconciler reconciles ImageBuild resources.
+type Reconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	EventRecorder record.EventRecorder
@@ -55,7 +55,7 @@ type ImageBuildReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // SetupWithManager registers the controller and its watches with the given manager.
-func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctx := context.Background()
 
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexPushSecret, func(obj client.Object) []string {
@@ -97,7 +97,7 @@ func (r *ImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ImageBuildReconciler) secretWatchPredicate() predicate.Predicate {
+func (r *Reconciler) secretWatchPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return true
@@ -114,7 +114,7 @@ func (r *ImageBuildReconciler) secretWatchPredicate() predicate.Predicate {
 	}
 }
 
-func (r *ImageBuildReconciler) mapSecretToImageBuilds() handler.EventHandler {
+func (r *Reconciler) mapSecretToImageBuilds() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
@@ -146,7 +146,7 @@ func (r *ImageBuildReconciler) mapSecretToImageBuilds() handler.EventHandler {
 }
 
 // Reconcile reconciles the desired state of an ImageBuild with the cluster state.
-func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ImageBuildName", req.Name, "ImageBuildNamespace", req.Namespace)
 	logger.Info("Starting Reconcile")
 
@@ -254,7 +254,7 @@ func (r *ImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *ImageBuildReconciler) ensureBuildRun(
+func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *ctrl.Result, error) {
@@ -295,7 +295,7 @@ func (r *ImageBuildReconciler) ensureBuildRun(
 	return nil, nil, nil
 }
 
-func (r *ImageBuildReconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	if ib.Spec.OnCommit == nil {
 		return nil
 	}

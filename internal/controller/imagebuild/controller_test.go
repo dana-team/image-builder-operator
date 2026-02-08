@@ -156,7 +156,7 @@ func newWebhookImageBuild(t *testing.T) *buildv1alpha1.ImageBuild {
 	return ib
 }
 
-func requireReconcile(t *testing.T, ctx context.Context, r *ImageBuildReconciler, ib *buildv1alpha1.ImageBuild) ctrl.Result {
+func requireReconcile(t *testing.T, ctx context.Context, r *Reconciler, ib *buildv1alpha1.ImageBuild) ctrl.Result {
 	t.Helper()
 
 	res, err := r.Reconcile(ctx, ctrl.Request{
@@ -182,7 +182,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 
 	t.Run("ignores secrets not referenced by any ImageBuild", func(t *testing.T) {
 		c := newClientWithSecretIndexes(t)
-		r := &ImageBuildReconciler{Client: c, Scheme: newScheme(t)}
+		r := &Reconciler{Client: c, Scheme: newScheme(t)}
 		handler := r.mapSecretToImageBuilds()
 		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 		defer queue.ShutDown()
@@ -214,7 +214,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
 
 		c := newClientWithSecretIndexes(t, secret, ibPush)
-		r := &ImageBuildReconciler{Client: c, Scheme: newScheme(t)}
+		r := &Reconciler{Client: c, Scheme: newScheme(t)}
 		handler := r.mapSecretToImageBuilds()
 		queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 		defer queue.ShutDown()

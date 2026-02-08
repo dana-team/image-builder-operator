@@ -19,7 +19,7 @@ const (
 	onCommitLabelKey    = "build.dana.io/oncommit-enabled"
 )
 
-func (r *ImageBuildReconciler) reconcileRebuild(
+func (r *Reconciler) reconcileRebuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *time.Duration, error) {
@@ -47,7 +47,7 @@ func (r *ImageBuildReconciler) reconcileRebuild(
 	return r.createBuildRun(ctx, ib, pendingCommit)
 }
 
-func (r *ImageBuildReconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	desired := "false"
 	if ib.Spec.Rebuild != nil && ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit {
 		desired = "true"
@@ -79,13 +79,13 @@ func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
 	return ib.Status.OnCommit.LastTriggeredBuildRun.CommitSHA == commitSHA
 }
 
-func (r *ImageBuildReconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	orig := ib.DeepCopy()
 	ib.Status.OnCommit.Pending = nil
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *ImageBuildReconciler) getActiveBuildRun(
+func (r *Reconciler) getActiveBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
@@ -114,7 +114,7 @@ func isActiveBuildRun(br *shipwright.BuildRun) bool {
 	return status != corev1.ConditionTrue && status != corev1.ConditionFalse
 }
 
-func (r *ImageBuildReconciler) createBuildRun(
+func (r *Reconciler) createBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	commitSHA string,
@@ -174,7 +174,7 @@ func nextTrigger(ib *buildv1alpha1.ImageBuild) int64 {
 	return counter + 1
 }
 
-func (r *ImageBuildReconciler) markTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {
+func (r *Reconciler) markTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {
 	orig := ib.DeepCopy()
 	ib.Status.OnCommit.TriggerCounter = triggerCounter
 	ib.Status.OnCommit.LastTriggeredBuildRun = &buildv1alpha1.ImageBuildOnCommitLastTriggered{
