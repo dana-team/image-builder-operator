@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// Handler handles incoming Git webhook requests and triggers on-commit rebuilds for matching ImageBuilds.
 type Handler struct {
 	Client        client.Client
 	EventRecorder record.EventRecorder
