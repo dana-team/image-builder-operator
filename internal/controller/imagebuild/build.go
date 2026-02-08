@@ -51,7 +51,7 @@ func (r *Reconciler) newBuild(
 			Name:      buildNameFor(ib),
 			Namespace: ib.Namespace,
 			Labels: map[string]string{
-				"build.dana.io/parent-imagebuild": ib.Name,
+				labelKeyParentImageBuild: ib.Name,
 			},
 		},
 		Spec: shipwright.BuildSpec{

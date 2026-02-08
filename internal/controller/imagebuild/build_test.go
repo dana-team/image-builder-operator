@@ -32,7 +32,7 @@ func TestNewBuild(t *testing.T) {
 		require.Equal(t, shipwright.GitType, build.Spec.Source.Type)
 		require.Equal(t, ib.Spec.Output.Image, build.Spec.Output.Image)
 		require.NotNil(t, build.Labels)
-		require.Equal(t, ib.Name, build.Labels["build.dana.io/parent-imagebuild"])
+		require.Equal(t, ib.Name, build.Labels[labelKeyParentImageBuild])
 	})
 
 	t.Run("includes optional fields when specified", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestReconcileBuild(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      buildNameFor(ib),
 				Namespace: ib.Namespace,
-				Labels:    map[string]string{"build.dana.io/parent-imagebuild": ib.Name},
+				Labels:    map[string]string{labelKeyParentImageBuild: ib.Name},
 			},
 			Spec: shipwright.BuildSpec{
 				Strategy: shipwright.Strategy{Name: absentStrategy, Kind: &kind},
@@ -152,7 +152,7 @@ func TestReconcileBuild(t *testing.T) {
 		updated := &shipwright.Build{}
 		require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildNameFor(ib), Namespace: ib.Namespace}, updated))
 		require.NotNil(t, updated.Labels)
-		require.Equal(t, ib.Name, updated.Labels["build.dana.io/parent-imagebuild"], "Label should be added to existing Build")
+		require.Equal(t, ib.Name, updated.Labels[labelKeyParentImageBuild], "Label should be added to existing Build")
 	})
 
 	t.Run("fails when Build owned by another ImageBuild", func(t *testing.T) {

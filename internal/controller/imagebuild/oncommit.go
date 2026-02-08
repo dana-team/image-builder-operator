@@ -16,7 +16,6 @@ import (
 const (
 	onCommitDebounce    = 10 * time.Second
 	onCommitMinInterval = 30 * time.Second
-	onCommitLabelKey    = "build.dana.io/oncommit-enabled"
 )
 
 func (r *Reconciler) reconcileRebuild(
@@ -56,12 +55,12 @@ func (r *Reconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.
 	if ib.Labels == nil {
 		ib.Labels = map[string]string{}
 	}
-	if ib.Labels[onCommitLabelKey] == desired {
+	if ib.Labels[labelKeyOnCommitEnabled] == desired {
 		return nil
 	}
 
 	orig := ib.DeepCopy()
-	ib.Labels[onCommitLabelKey] = desired
+	ib.Labels[labelKeyOnCommitEnabled] = desired
 	return r.Patch(ctx, ib, client.MergeFrom(orig))
 }
 
@@ -122,7 +121,7 @@ func (r *Reconciler) createBuildRun(
 	counter := nextTrigger(ib)
 	br := newBuildRun(ib, counter)
 	br.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	br.Labels["build.dana.io/build-trigger"] = "oncommit"
+	br.Labels[labelKeyBuildTrigger] = "oncommit"
 
 	existing := &shipwright.BuildRun{}
 	key := client.ObjectKeyFromObject(br)

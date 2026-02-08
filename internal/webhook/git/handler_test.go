@@ -146,7 +146,7 @@ func newOnCommitImageBuild(url string) *buildv1alpha1.ImageBuild {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ib",
 			Namespace: "ns",
-			Labels:    map[string]string{"build.dana.io/oncommit-enabled": "true"},
+			Labels:    map[string]string{labelKeyOnCommitEnabled: "true"},
 		},
 		Spec: buildv1alpha1.ImageBuildSpec{
 			OnCommit: &buildv1alpha1.ImageBuildOnCommit{

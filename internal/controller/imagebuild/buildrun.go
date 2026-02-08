@@ -20,8 +20,6 @@ import (
 	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 )
 
-const annotationKeyLastBuildSpec = "build.dana.io/last-build-spec"
-
 // buildInputs captures fields that trigger a new build when changed.
 type buildInputs struct {
 	Source    buildv1alpha1.ImageBuildSource `json:"source"`
@@ -41,7 +39,7 @@ func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildR
 			Name:      buildRunNameFor(ib, counter),
 			Namespace: ib.Namespace,
 			Labels: map[string]string{
-				"build.dana.io/parent-imagebuild": ib.Name,
+				labelKeyParentImageBuild: ib.Name,
 			},
 		},
 		Spec: shipwright.BuildRunSpec{

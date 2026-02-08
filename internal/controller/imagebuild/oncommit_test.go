@@ -46,7 +46,7 @@ func TestReconcileRebuild(t *testing.T) {
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
 		require.Equal(t, expectedOnCommitBuildRunName, br.Name)
-		require.Equal(t, "oncommit", br.Labels["build.dana.io/build-trigger"])
+		require.Equal(t, "oncommit", br.Labels[labelKeyBuildTrigger])
 	})
 
 	t.Run("returns active BuildRun when present", func(t *testing.T) {
@@ -388,27 +388,27 @@ func TestEnsureOnCommitLabel(t *testing.T) {
 
 		require.NoError(t, r.ensureOnCommitLabel(ctx, ib))
 		require.NotNil(t, ib.Labels)
-		require.Equal(t, "true", ib.Labels[onCommitLabelKey])
+		require.Equal(t, "true", ib.Labels[labelKeyOnCommitEnabled])
 
 		latest := &buildv1alpha1.ImageBuild{}
 		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 		require.NotNil(t, latest.Labels)
-		require.Equal(t, "true", latest.Labels[onCommitLabelKey])
+		require.Equal(t, "true", latest.Labels[labelKeyOnCommitEnabled])
 	})
 
 	t.Run("clears label when on-commit rebuild disabled", func(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
-		ib.Labels = map[string]string{onCommitLabelKey: "true"}
+		ib.Labels = map[string]string{labelKeyOnCommitEnabled: "true"}
 
 		r, c := newReconciler(t, ib)
 
 		require.NoError(t, r.ensureOnCommitLabel(ctx, ib))
 		require.NotNil(t, ib.Labels)
-		require.Equal(t, "false", ib.Labels[onCommitLabelKey])
+		require.Equal(t, "false", ib.Labels[labelKeyOnCommitEnabled])
 
 		latest := &buildv1alpha1.ImageBuild{}
 		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
 		require.NotNil(t, latest.Labels)
-		require.Equal(t, "false", latest.Labels[onCommitLabelKey])
+		require.Equal(t, "false", latest.Labels[labelKeyOnCommitEnabled])
 	})
 }
