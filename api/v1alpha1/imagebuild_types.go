@@ -21,26 +21,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ImageBuildSourceType defines the type of source code input for an ImageBuild.
 type ImageBuildSourceType string
 
-const (
-	ImageBuildSourceTypeGit ImageBuildSourceType = "Git"
-)
+// ImageBuildSourceTypeGit indicates a Git repository source.
+const ImageBuildSourceTypeGit ImageBuildSourceType = "Git"
 
+// ImageBuildRebuildMode defines the strategy used to trigger image rebuilds.
 type ImageBuildRebuildMode string
 
 const (
-	ImageBuildRebuildModeInitial  ImageBuildRebuildMode = "Initial"
+	// ImageBuildRebuildModeInitial rebuilds the image only when the desired spec changes.
+	ImageBuildRebuildModeInitial ImageBuildRebuildMode = "Initial"
+	// ImageBuildRebuildModeOnCommit rebuilds the image when the desired spec changes or when a new commit is pushed.
 	ImageBuildRebuildModeOnCommit ImageBuildRebuildMode = "OnCommit"
 )
 
+// ImageBuildFileMode indicates whether a Dockerfile/Containerfile is expected in the source.
 type ImageBuildFileMode string
 
 const (
+	// ImageBuildFileModePresent selects a buildfile-based build strategy.
 	ImageBuildFileModePresent ImageBuildFileMode = "Present"
-	ImageBuildFileModeAbsent  ImageBuildFileMode = "Absent"
+	// ImageBuildFileModeAbsent selects a non-buildfile-based build strategy.
+	ImageBuildFileModeAbsent ImageBuildFileMode = "Absent"
 )
 
+// ImageBuildFile configures the build strategy based on the presence of a Dockerfile/Containerfile.
 type ImageBuildFile struct {
 	// +kubebuilder:validation:Enum=Present;Absent
 	// Mode selects whether the source is expected to contain a Dockerfile/Containerfile.
@@ -48,6 +55,7 @@ type ImageBuildFile struct {
 	Mode ImageBuildFileMode `json:"mode"`
 }
 
+// ImageBuildSpec defines the desired state of an ImageBuild.
 type ImageBuildSpec struct {
 	// Source refers to the location where the source code is.
 	Source ImageBuildSource `json:"source"`
@@ -67,6 +75,7 @@ type ImageBuildSpec struct {
 	OnCommit *ImageBuildOnCommit `json:"onCommit,omitempty"`
 }
 
+// ImageBuildSource describes the source code location for an ImageBuild.
 type ImageBuildSource struct {
 	// +kubebuilder:validation:Enum=Git
 	// Type is the type of source code used as input for the build.
@@ -82,6 +91,7 @@ type ImageBuildSource struct {
 	ContextDir string `json:"contextDir,omitempty"`
 }
 
+// ImageBuildGitSource contains the details for obtaining source code from a Git repository.
 type ImageBuildGitSource struct {
 	// +kubebuilder:validation:MinLength=1
 	// URL describes the URL of the Git repository.
@@ -98,12 +108,14 @@ type ImageBuildGitSource struct {
 	CloneSecret *corev1.LocalObjectReference `json:"cloneSecret,omitempty"`
 }
 
+// ImageBuildRebuild configures the rebuild behavior of an ImageBuild.
 type ImageBuildRebuild struct {
 	// +kubebuilder:validation:Enum=Initial;OnCommit
 	// Mode selects the rebuild strategy.
 	Mode ImageBuildRebuildMode `json:"mode"`
 }
 
+// ImageBuildOutput defines where the built image is pushed.
 type ImageBuildOutput struct {
 	// Image is the reference of the image.
 	// +kubebuilder:validation:MinLength=1
@@ -114,11 +126,13 @@ type ImageBuildOutput struct {
 	PushSecret *corev1.LocalObjectReference `json:"pushSecret,omitempty"`
 }
 
+// ImageBuildOnCommit configures webhook-triggered rebuilds on new commits.
 type ImageBuildOnCommit struct {
 	// WebhookSecretRef references the Secret used to verify webhook requests.
 	WebhookSecretRef corev1.SecretKeySelector `json:"webhookSecretRef"`
 }
 
+// ImageBuildStatus defines the observed state of an ImageBuild.
 type ImageBuildStatus struct {
 	// +optional
 	// ObservedGeneration is the .metadata.generation last processed by the
@@ -153,6 +167,7 @@ type ImageBuildStatus struct {
 	OnCommit *ImageBuildOnCommitStatus `json:"onCommit,omitempty"`
 }
 
+// ImageBuildOnCommitEvent records the details of a received webhook event.
 type ImageBuildOnCommitEvent struct {
 	// Ref is the git ref from the webhook payload.
 	// +optional
@@ -167,6 +182,7 @@ type ImageBuildOnCommitEvent struct {
 	ReceivedAt metav1.Time `json:"receivedAt,omitempty"`
 }
 
+// ImageBuildOnCommitLastTriggered records the last BuildRun triggered by a webhook event.
 type ImageBuildOnCommitLastTriggered struct {
 	// Name is the name of the last BuildRun created from an on-commit trigger.
 	// +optional
@@ -181,6 +197,7 @@ type ImageBuildOnCommitLastTriggered struct {
 	TriggeredAt metav1.Time `json:"triggeredAt,omitempty"`
 }
 
+// ImageBuildOnCommitStatus holds the on-commit trigger state for an ImageBuild.
 type ImageBuildOnCommitStatus struct {
 	// LastReceived is the last received webhook event.
 	// +optional
@@ -213,6 +230,7 @@ type ImageBuild struct {
 	Status ImageBuildStatus `json:"status,omitempty"`
 }
 
+// ImageBuildList contains a list of ImageBuild resources.
 // +kubebuilder:object:root=true
 type ImageBuildList struct {
 	metav1.TypeMeta `json:",inline"`

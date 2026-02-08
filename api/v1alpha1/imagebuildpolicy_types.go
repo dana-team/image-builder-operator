@@ -20,17 +20,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ImageBuildPolicySpec defines the desired state of an ImageBuildPolicy.
 type ImageBuildPolicySpec struct {
 	// ClusterBuildStrategy holds platform defaults for selecting a build strategy.
 	ClusterBuildStrategy ImageBuildClusterStrategy `json:"clusterBuildStrategy"`
 }
 
+// ImageBuildClusterStrategy holds platform defaults for selecting a ClusterBuildStrategy.
 type ImageBuildClusterStrategy struct {
 	// BuildFile holds strategy defaults for selecting a strategy based on whether a
 	// build file indicator is present (e.g. Dockerfile, Containerfile).
 	BuildFile ImageBuildFileStrategy `json:"buildFile"`
 }
 
+// ImageBuildFileStrategy defines which ClusterBuildStrategy to use based on the presence or absence of a build file.
 type ImageBuildFileStrategy struct {
 	// Present is the strategy name to use when the source indicates a file-based build.
 	// +kubebuilder:validation:MinLength=1
@@ -44,6 +47,7 @@ type ImageBuildFileStrategy struct {
 // ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy
 type ImageBuildPolicyStatus struct{}
 
+// ImageBuildPolicy is the Schema for the ImageBuildPolicies API.
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster,shortName=ibp
 type ImageBuildPolicy struct {
@@ -54,6 +58,7 @@ type ImageBuildPolicy struct {
 	Status ImageBuildPolicyStatus `json:"status,omitempty"`
 }
 
+// ImageBuildPolicyList contains a list of ImageBuildPolicy resources.
 // +kubebuilder:object:root=true
 type ImageBuildPolicyList struct {
 	metav1.TypeMeta `json:",inline"`

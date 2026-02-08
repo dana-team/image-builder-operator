@@ -29,6 +29,9 @@ linters:
       rules:
         - name: comment-spacings
         - name: import-shadowing
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
   exclusions:
     generated: lax
     rules:
