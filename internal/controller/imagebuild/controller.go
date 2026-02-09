@@ -34,6 +34,8 @@ const (
 	indexPushSecret    = "pushSecret"
 	indexCloneSecret   = "cloneSecret"
 	indexWebhookSecret = "webhookSecret"
+
+	buildRunPollInterval = 10 * time.Second
 )
 
 // Reconciler reconciles ImageBuild resources.
@@ -252,7 +254,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	cond := meta.FindStatusCondition(imageBuild.Status.Conditions, TypeBuildSucceeded)
 	if cond != nil && cond.Status == metav1.ConditionUnknown {
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: buildRunPollInterval}, nil
 	}
 
 	return ctrl.Result{}, nil

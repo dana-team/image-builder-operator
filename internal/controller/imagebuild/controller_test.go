@@ -294,7 +294,7 @@ func TestReconcile(t *testing.T) {
 			r, _ := newReconciler(t, ib, policy, strategy, runningBuildRun)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Equal(t, 10*time.Second, res.RequeueAfter)
+			require.Equal(t, buildRunPollInterval, res.RequeueAfter)
 		})
 	})
 }
