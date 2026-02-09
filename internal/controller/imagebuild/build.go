@@ -39,7 +39,7 @@ func (r *Reconciler) reconcileBuild(
 
 	op, err := controllerutil.CreateOrPatch(ctx, r.Client, actual, func() error {
 		if err := controllerutil.SetControllerReference(ib, actual, r.Scheme); err != nil {
-			return err
+			return fmt.Errorf("failed to set controller reference on Build %q: %w", actual.Name, err)
 		}
 		if actual.Labels == nil {
 			actual.Labels = make(map[string]string, len(desired.Labels))
@@ -51,7 +51,7 @@ func (r *Reconciler) reconcileBuild(
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create or patch Build %q: %w", actual.Name, err)
 	}
 	if op != controllerutil.OperationResultNone {
 		logger.Info("Reconciled Shipwright Build", "name", actual.Name, "operation", string(op))
@@ -129,7 +129,11 @@ func (r *Reconciler) patchReadyCondition(
 		ObservedGeneration: ib.Generation,
 	})
 
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch Ready condition status: %w", err)
+	}
+
+	return nil
 }
 
 func buildNameFor(ib *buildv1alpha1.ImageBuild) string {

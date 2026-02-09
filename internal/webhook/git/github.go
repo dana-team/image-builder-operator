@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/google/go-github/v69/github"
 )
+
+var errUnexpectedGitHubEvent = errors.New("unexpected GitHub event type")
 
 type githubProvider struct{}
 
@@ -28,7 +31,7 @@ func (p *githubProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 	}
 	payload, ok := webhookEvent.(*github.PushEvent)
 	if !ok {
-		return nil, fmt.Errorf("unexpected GitHub event type: %T", webhookEvent)
+		return nil, fmt.Errorf("%w: %T", errUnexpectedGitHubEvent, webhookEvent)
 	}
 
 	repo := strings.TrimSpace(payload.GetRepo().GetCloneURL())
@@ -36,7 +39,7 @@ func (p *githubProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 		repo = strings.TrimSpace(payload.GetRepo().GetHTMLURL())
 	}
 	if repo == "" || strings.TrimSpace(payload.GetRef()) == "" {
-		return nil, fmt.Errorf("missing required fields: ref or repository URL")
+		return nil, errMissingPushEventFields
 	}
 	return &pushEvent{RepoURL: repo, Ref: payload.GetRef(), CommitSHA: payload.GetAfter()}, nil
 }
@@ -44,6 +47,9 @@ func (p *githubProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 // Authenticate validates the GitHub webhook signature against the shared secret.
 func (p *githubProvider) Authenticate(r *http.Request, body []byte, secret []byte) error {
 	r.Body = io.NopCloser(bytes.NewReader(body))
-	_, err := github.ValidatePayload(r, secret)
-	return err
+	if _, err := github.ValidatePayload(r, secret); err != nil {
+		return fmt.Errorf("failed to validate GitHub webhook signature: %w", err)
+	}
+
+	return nil
 }

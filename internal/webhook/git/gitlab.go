@@ -38,7 +38,7 @@ func (p *gitlabProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 		repo = strings.TrimSpace(payload.Project.WebURL)
 	}
 	if repo == "" || strings.TrimSpace(payload.Ref) == "" {
-		return nil, fmt.Errorf("missing required fields: ref or repository URL")
+		return nil, errMissingPushEventFields
 	}
 	return &pushEvent{RepoURL: repo, Ref: payload.Ref, CommitSHA: payload.After}, nil
 }
@@ -47,9 +47,12 @@ func (p *gitlabProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 func (p *gitlabProvider) Authenticate(r *http.Request, body []byte, secret []byte) error {
 	hook, err := gitlab.New(gitlab.Options.Secret(string(secret)))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create GitLab webhook validator: %w", err)
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
-	_, err = hook.Parse(r, gitlab.PushEvents)
-	return err
+	if _, err = hook.Parse(r, gitlab.PushEvents); err != nil {
+		return fmt.Errorf("failed to validate GitLab webhook token: %w", err)
+	}
+
+	return nil
 }

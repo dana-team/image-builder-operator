@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -217,7 +218,7 @@ func updateImageBuild(ctx context.Context, c client.Client, namespace, imageBuil
 	err := retry.RetryOnConflict(backoff, func() error {
 		imageBuild := &buildv1alpha1.ImageBuild{}
 		if err := c.Get(ctx, types.NamespacedName{Name: imageBuildName, Namespace: namespace}, imageBuild); err != nil {
-			return err
+			return fmt.Errorf("failed to get ImageBuild %s/%s: %w", namespace, imageBuildName, err)
 		}
 		imageBuild.Spec.Source.Git.Revision = revision
 		return c.Update(ctx, imageBuild)

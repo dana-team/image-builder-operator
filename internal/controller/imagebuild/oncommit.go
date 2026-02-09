@@ -63,7 +63,12 @@ func (r *Reconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.
 
 	orig := ib.DeepCopy()
 	ib.Labels[labelKeyOnCommitEnabled] = desired
-	return r.Patch(ctx, ib, client.MergeFrom(orig))
+
+	if err := r.Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch oncommit label: %w", err)
+	}
+
+	return nil
 }
 
 func isRebuildEnabled(ib *buildv1alpha1.ImageBuild) bool {
@@ -103,7 +108,12 @@ func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
 func (r *Reconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	orig := ib.DeepCopy()
 	ib.Status.OnCommit.Pending = nil
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to clear pending commit status: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Reconciler) activeBuildRun(
@@ -117,7 +127,10 @@ func (r *Reconciler) activeBuildRun(
 	active := &shipwright.BuildRun{}
 	key := client.ObjectKey{Namespace: ib.Namespace, Name: ib.Status.LastBuildRunRef}
 	if err := r.Get(ctx, key, active); err != nil {
-		return nil, client.IgnoreNotFound(err)
+		if notFoundErr := client.IgnoreNotFound(err); notFoundErr != nil {
+			return nil, fmt.Errorf("failed to get active BuildRun %q: %w", key.Name, notFoundErr)
+		}
+		return nil, nil
 	}
 
 	if metav1.IsControlledBy(active, ib) && isActiveBuildRun(active) {
@@ -154,17 +167,17 @@ func (r *Reconciler) createBuildRun(
 		}
 		return existing, nil, nil
 	} else if client.IgnoreNotFound(err) != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to get on-commit BuildRun %q: %w", key.Name, err)
 	}
 
 	if err := controllerutil.SetControllerReference(ib, br, r.Scheme); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to set controller reference on on-commit BuildRun %q: %w", br.Name, err)
 	}
 	if err := r.Create(ctx, br); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to create on-commit BuildRun %q: %w", br.Name, err)
 	}
 	if err := r.markTriggered(ctx, ib, br, counter, commitSHA); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to mark triggered for BuildRun %q: %w", br.Name, err)
 	}
 
 	return br, nil, nil
@@ -187,5 +200,10 @@ func (r *Reconciler) markTriggered(ctx context.Context, ib *buildv1alpha1.ImageB
 		TriggeredAt: metav1.Now(),
 	}
 	ib.Status.OnCommit.Pending = nil
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch on-commit triggered status: %w", err)
+	}
+
+	return nil
 }

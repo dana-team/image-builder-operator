@@ -42,20 +42,20 @@ func (r *Reconciler) reconcileBuildRun(
 		}
 		return existing, nil
 	} else if client.IgnoreNotFound(err) != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get BuildRun %q: %w", key.Name, err)
 	}
 
 	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set controller reference on BuildRun %q: %w", desired.Name, err)
 	}
 	if err := r.Create(ctx, desired); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create BuildRun %q: %w", desired.Name, err)
 	}
 
 	orig := ib.DeepCopy()
 	ib.Status.BuildRunCounter = counter
 	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to patch BuildRunCounter status: %w", err)
 	}
 
 	return desired, nil
@@ -80,7 +80,11 @@ func (r *Reconciler) patchBuildSucceededCondition(
 		ObservedGeneration: ib.Generation,
 	})
 
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch BuildSucceeded condition status: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Reconciler) patchLatestImage(
@@ -95,7 +99,12 @@ func (r *Reconciler) patchLatestImage(
 	orig := ib.DeepCopy()
 	ib.Status.ObservedGeneration = ib.Generation
 	ib.Status.LatestImage = latestImage
-	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
+
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch latest image status: %w", err)
+	}
+
+	return nil
 }
 
 // isNewBuildRequired reports whether a new BuildRun should be created,
@@ -149,7 +158,7 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 
 	specJSON, err := json.Marshal(inputs)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal build spec annotation: %w", err)
 	}
 
 	ib.Annotations[annotationKeyLastBuildSpec] = string(specJSON)

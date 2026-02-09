@@ -2,6 +2,7 @@ package imagebuild
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
@@ -16,6 +17,8 @@ import (
 )
 
 const absentStrategy = "absent-strategy"
+
+var errFake = errors.New("fake error")
 
 func newScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
@@ -122,6 +125,19 @@ func newClientWithSecretIndexes(t *testing.T, objects ...client.Object) client.C
 		}).
 		WithObjects(objects...).
 		Build()
+}
+
+// buildCreateErrorClient injects errors when creating Build objects,
+// used to exercise the generic error fallthrough in ensureBuild.
+type buildCreateErrorClient struct {
+	client.Client
+}
+
+func (c *buildCreateErrorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if _, ok := obj.(*shipwright.Build); ok {
+		return errFake
+	}
+	return c.Client.Create(ctx, obj, opts...)
 }
 
 type getErrorClient struct {

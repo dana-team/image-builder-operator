@@ -3,7 +3,6 @@ package imagebuild
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -81,7 +80,7 @@ func TestReconcileBuildRun(t *testing.T) {
 	t.Run("returns error when Get fails", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
-		r.Client = &getErrorClient{Client: r.Client, err: errors.New("boom")}
+		r.Client = &getErrorClient{Client: r.Client, err: errFake}
 
 		br, err := r.reconcileBuildRun(ctx, ib)
 		require.Nil(t, br)

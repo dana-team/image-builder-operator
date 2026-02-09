@@ -7,6 +7,8 @@ linters:
     - copyloopvar
     - dupl
     - errcheck
+    - err113
+    - errname
     - ginkgolinter
     - goconst
     - gocyclo
@@ -25,7 +27,10 @@ linters:
     - errorlint
     - bodyclose
     - predeclared
+    - wrapcheck
   settings:
+    errcheck:
+      check-blank: true
     govet:
       enable:
         - shadow
@@ -48,6 +53,10 @@ linters:
           - dupl
           - lll
         path: internal/*
+      - linters:
+          - wrapcheck
+          - err113
+        path: _test\.go$
     paths:
       - third_party$
       - builtin$

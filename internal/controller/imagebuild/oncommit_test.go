@@ -2,7 +2,6 @@ package imagebuild
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -209,7 +208,7 @@ func TestReconcileRebuild(t *testing.T) {
 
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
-		r.Client = &getErrorClient{Client: r.Client, err: errors.New("boom")}
+		r.Client = &getErrorClient{Client: r.Client, err: errFake}
 
 		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.Error(t, err)

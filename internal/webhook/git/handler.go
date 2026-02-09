@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,16 @@ import (
 )
 
 const labelKeyOnCommitEnabled = "build.dana.io/oncommit-enabled"
+
+// Sentinel errors for webhook handling.
+var (
+	errMethodNotAllowed        = errors.New("method not allowed")
+	errUnsupportedWebhook      = errors.New("unsupported webhook event: only GitHub and GitLab push events are supported")
+	errMissingOnCommit         = errors.New("missing spec.onCommit")
+	errMissingWebhookSecretKey = errors.New("missing key in webhook secret")
+
+	errMissingPushEventFields = errors.New("missing required fields: ref or repository URL")
+)
 
 // Handler handles incoming Git webhook requests and triggers on-commit rebuilds for matching ImageBuilds.
 type Handler struct {
@@ -110,7 +121,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) detectProvider(r *http.Request) ([]byte, webhookProvider, error) {
 	if r.Method != http.MethodPost {
-		return nil, nil, fmt.Errorf("method %s not allowed", r.Method)
+		return nil, nil, fmt.Errorf("%w: %s", errMethodNotAllowed, r.Method)
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -123,14 +134,14 @@ func (h *Handler) detectProvider(r *http.Request) ([]byte, webhookProvider, erro
 		}
 	}
 
-	return nil, nil, fmt.Errorf("unsupported webhook event: only GitHub and GitLab push events are supported")
+	return nil, nil, errUnsupportedWebhook
 }
 
 func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.ImageBuild, event *pushEvent, now metav1.Time) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &buildv1alpha1.ImageBuild{}
 		if err := h.Client.Get(ctx, types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace}, latest); err != nil {
-			return err
+			return fmt.Errorf("failed to get ImageBuild %s/%s: %w", ib.Namespace, ib.Name, err)
 		}
 		if latest.Status.OnCommit == nil {
 			latest.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{}
@@ -143,12 +154,16 @@ func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.Ima
 		latest.Status.OnCommit.LastReceived = onCommitEvent
 		latest.Status.OnCommit.Pending = onCommitEvent
 		return h.Client.Status().Update(ctx, latest)
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to patch on-commit status for %s/%s: %w", ib.Namespace, ib.Name, err)
+	}
+
+	return nil
 }
 
 func resolveWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha1.ImageBuild) ([]byte, error) {
 	if ib.Spec.OnCommit == nil {
-		return nil, fmt.Errorf("missing spec.onCommit")
+		return nil, errMissingOnCommit
 	}
 	ref := ib.Spec.OnCommit.WebhookSecretRef
 	sec := &corev1.Secret{}
@@ -157,11 +172,11 @@ func resolveWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha
 		Namespace: ib.Namespace,
 	}
 	if err := c.Get(ctx, key, sec); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get webhook secret %s/%s: %w", key.Namespace, key.Name, err)
 	}
 	val, ok := sec.Data[ref.Key]
 	if !ok || len(val) == 0 {
-		return nil, fmt.Errorf("missing key %q in secret %s/%s", ref.Key, key.Namespace, key.Name)
+		return nil, fmt.Errorf("%w: %q in secret %s/%s", errMissingWebhookSecretKey, ref.Key, key.Namespace, key.Name)
 	}
 	return val, nil
 }

@@ -39,6 +39,12 @@ const (
 	errorRequeueInterval = 30 * time.Second
 )
 
+// Sentinel errors for webhook secret validation.
+var (
+	errWebhookSecretMissing    = errors.New("webhook secret not found")
+	errWebhookSecretInvalidKey = errors.New("webhook secret key not found")
+)
+
 // Reconciler reconciles ImageBuild resources.
 type Reconciler struct {
 	client.Client
@@ -68,7 +74,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to index field %q: %w", indexPushSecret, err)
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexCloneSecret, func(obj client.Object) []string {
@@ -78,7 +84,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to index field %q: %w", indexCloneSecret, err)
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexWebhookSecret, func(obj client.Object) []string {
@@ -88,16 +94,20 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to index field %q: %w", indexWebhookSecret, err)
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
 		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.secretWatchPredicate())).
 		Named(controllerName).
-		Complete(r)
+		Complete(r); err != nil {
+		return fmt.Errorf("failed to build controller: %w", err)
+	}
+
+	return nil
 }
 
 // secretWatchPredicate returns a predicate that only accepts Secret create
@@ -173,33 +183,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
-	var alreadyOwned *controllerutil.AlreadyOwnedError
-
-	policy := &buildv1alpha1.ImageBuildPolicy{}
-	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
-		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing")
-		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
-	}
-
-	present := policy.Spec.ClusterBuildStrategy.BuildFile.Present
-	absent := policy.Spec.ClusterBuildStrategy.BuildFile.Absent
-
-	selectedStrategyName := absent
-	if imageBuild.Spec.BuildFile.Mode == buildv1alpha1.ImageBuildFileModePresent {
-		selectedStrategyName = present
-	}
-
-	if err := r.reconcileBuild(ctx, imageBuild, selectedStrategyName); err != nil {
-		if apierrors.IsNotFound(err) {
-			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildStrategyNotFound, err.Error())
-			return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
-		}
-		if errors.As(err, &alreadyOwned) {
-			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildConflict, err.Error())
-			return ctrl.Result{}, nil
-		}
-		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildReconcileFailed, err.Error())
-		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
+	if result := r.ensureBuild(ctx, imageBuild); result != nil {
+		return *result, nil
 	}
 
 	buildRef := buildNameFor(imageBuild)
@@ -208,14 +193,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		imageBuild.Status.ObservedGeneration = imageBuild.Generation
 		imageBuild.Status.BuildRef = buildRef
 		if err := r.Status().Patch(ctx, imageBuild, client.MergeFrom(orig)); err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to patch ImageBuild status: %w", err)
 		}
 	}
 
 	var buildRun *shipwright.BuildRun
 
 	if br, requeueAfter, err := r.reconcileRebuild(ctx, imageBuild); err != nil {
-		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error())
+		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	} else if requeueAfter != nil {
 		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
@@ -225,8 +212,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	if buildRun == nil {
 		br, result, err := r.ensureBuildRun(ctx, imageBuild)
-		if err != nil || result != nil {
-			return *result, err
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if result != nil {
+			return *result, nil
 		}
 		buildRun = br
 	}
@@ -261,30 +251,84 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
+// ensureBuild reconciles the Build for the given ImageBuild
+// based on the cluster-wide ImageBuildPolicy.
+func (r *Reconciler) ensureBuild(ctx context.Context, imageBuild *buildv1alpha1.ImageBuild) *ctrl.Result {
+	logger := log.FromContext(ctx)
+
+	policy := &buildv1alpha1.ImageBuildPolicy{}
+	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
+		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing"); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
+		return &ctrl.Result{RequeueAfter: errorRequeueInterval}
+	}
+
+	present := policy.Spec.ClusterBuildStrategy.BuildFile.Present
+	absent := policy.Spec.ClusterBuildStrategy.BuildFile.Absent
+
+	selectedStrategyName := absent
+	if imageBuild.Spec.BuildFile.Mode == buildv1alpha1.ImageBuildFileModePresent {
+		selectedStrategyName = present
+	}
+
+	if err := r.reconcileBuild(ctx, imageBuild, selectedStrategyName); err != nil {
+		var (
+			reason       = ReasonBuildReconcileFailed
+			requeue      = true
+			alreadyOwned *controllerutil.AlreadyOwnedError
+		)
+
+		switch {
+		case apierrors.IsNotFound(err):
+			reason = ReasonBuildStrategyNotFound
+		case errors.As(err, &alreadyOwned):
+			reason = ReasonBuildConflict
+			requeue = false
+		}
+
+		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, reason, err.Error()); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
+
+		if requeue {
+			return &ctrl.Result{RequeueAfter: errorRequeueInterval}
+		}
+		return &ctrl.Result{}
+	}
+
+	return nil
+}
+
 // ensureBuildRun creates a new BuildRun when the spec has changed,
 // or returns the existing one otherwise.
 func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	var alreadyOwned *controllerutil.AlreadyOwnedError
 
 	if r.isNewBuildRequired(ctx, imageBuild) {
 		br, err := r.reconcileBuildRun(ctx, imageBuild)
 		if err != nil {
 			if errors.As(err, &alreadyOwned) {
-				_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunConflict, err.Error())
+				if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunConflict, err.Error()); patchErr != nil {
+					logger.Error(patchErr, "failed to patch Ready condition")
+				}
 				return nil, &ctrl.Result{}, nil
 			}
-			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error())
+			if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
+				logger.Error(patchErr, "failed to patch Ready condition")
+			}
 			return nil, &ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 		}
 
 		if err := r.recordBuildSpec(imageBuild); err != nil {
-			return nil, &ctrl.Result{}, err
+			return nil, &ctrl.Result{}, fmt.Errorf("failed to record build spec: %w", err)
 		}
 		if err := r.Update(ctx, imageBuild); err != nil {
-			return nil, &ctrl.Result{}, err
+			return nil, &ctrl.Result{}, fmt.Errorf("failed to update ImageBuild: %w", err)
 		}
 
 		return br, nil, nil
@@ -294,7 +338,7 @@ func (r *Reconciler) ensureBuildRun(
 		existingBR := &shipwright.BuildRun{}
 		if err := r.Get(ctx, client.ObjectKey{Namespace: imageBuild.Namespace, Name: imageBuild.Status.LastBuildRunRef}, existingBR); err != nil {
 			if !apierrors.IsNotFound(err) {
-				log.FromContext(ctx).Error(err, "Failed to fetch last BuildRun", "BuildRun", imageBuild.Status.LastBuildRunRef)
+				return nil, &ctrl.Result{}, fmt.Errorf("failed to fetch last BuildRun %q: %w", imageBuild.Status.LastBuildRunRef, err)
 			}
 		} else {
 			return existingBR, nil, nil
@@ -305,6 +349,8 @@ func (r *Reconciler) ensureBuildRun(
 }
 
 func (r *Reconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	logger := log.FromContext(ctx)
+
 	if ib.Spec.OnCommit == nil {
 		return nil
 	}
@@ -320,17 +366,21 @@ func (r *Reconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.
 
 	if err := r.Get(ctx, key, secret); err != nil {
 		if apierrors.IsNotFound(err) {
-			msg := fmt.Sprintf("WebhookSecret %q not found", secretName)
-			_ = r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretMissing, msg)
-			return errors.New(msg)
+			if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretMissing,
+				fmt.Sprintf("WebhookSecret %q not found", secretName)); patchErr != nil {
+				logger.Error(patchErr, "failed to patch Ready condition")
+			}
+			return fmt.Errorf("%w: %q", errWebhookSecretMissing, secretName)
 		}
-		return err
+		return fmt.Errorf("failed to get webhook secret %q: %w", secretName, err)
 	}
 
 	if _, ok := secret.Data[secretKey]; !ok {
-		msg := fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey)
-		_ = r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey, msg)
-		return errors.New(msg)
+		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey,
+			fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey)); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
+		return fmt.Errorf("%w: key %q in secret %q", errWebhookSecretInvalidKey, secretKey, secretName)
 	}
 
 	return nil

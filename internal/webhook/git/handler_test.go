@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+var errFake = errors.New("fake error")
+
 const (
 	refHeadsMain      = "refs/heads/main"
 	revisionMain      = "main"
@@ -56,7 +58,7 @@ func TestServeHTTP(t *testing.T) {
 
 	t.Run("fails on list error", func(t *testing.T) {
 		c := newClient(t)
-		h := &Handler{Client: &listErrorClient{Client: c, err: errors.New("list failed")}}
+		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/repo.git"}}`
 		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))

@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -395,6 +396,58 @@ func TestEnsureBuildRun(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, result)
 		require.Nil(t, br)
+	})
+}
+
+func TestEnsureBuild(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("selects present strategy when BuildFile mode is present", func(t *testing.T) {
+		policy := newImageBuildPolicy()
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.BuildFile.Mode = buildv1alpha1.ImageBuildFileModePresent
+
+		strategy := &shipwright.ClusterBuildStrategy{
+			ObjectMeta: metav1.ObjectMeta{Name: policy.Spec.ClusterBuildStrategy.BuildFile.Present},
+		}
+		r, c := newReconciler(t, ib, policy, strategy)
+
+		result := r.ensureBuild(ctx, ib)
+
+		require.Nil(t, result, "expected nil result on success")
+
+		build := &shipwright.Build{}
+		require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildNameFor(ib), Namespace: ib.Namespace}, build))
+		require.Equal(t, policy.Spec.ClusterBuildStrategy.BuildFile.Present, build.Spec.Strategy.Name)
+	})
+
+	t.Run("returns early on generic reconcileBuild error", func(t *testing.T) {
+		policy := newImageBuildPolicy()
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		strategy := &shipwright.ClusterBuildStrategy{
+			ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+		}
+
+		s := newScheme(t)
+		fc := fake.NewClientBuilder().
+			WithScheme(s).
+			WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
+			WithObjects(ib, policy, strategy).
+			Build()
+
+		r := &Reconciler{
+			Client: &buildCreateErrorClient{Client: fc},
+			Scheme: s,
+		}
+
+		result := r.ensureBuild(ctx, ib)
+
+		require.NotNil(t, result, "expected non-nil result for early return")
+		require.Equal(t, errorRequeueInterval, result.RequeueAfter)
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, fc.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildReconcileFailed)
 	})
 }
 
