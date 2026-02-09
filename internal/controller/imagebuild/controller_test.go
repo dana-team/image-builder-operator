@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
@@ -38,7 +37,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Greater(t, res.RequeueAfter, time.Duration(0))
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonMissingPolicy)
@@ -50,7 +49,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib, policy)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Greater(t, res.RequeueAfter, time.Duration(0))
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildStrategyNotFound)
@@ -63,7 +62,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Greater(t, res.RequeueAfter, time.Duration(0))
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonWebhookSecretMissing)
@@ -85,7 +84,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib, secret)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Greater(t, res.RequeueAfter, time.Duration(0))
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey)
@@ -229,7 +228,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib, policy, strategy, webhookSecret, conflictingBuildRun)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Greater(t, res.RequeueAfter, time.Duration(0))
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunReconcileFailed)

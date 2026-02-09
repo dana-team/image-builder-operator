@@ -36,6 +36,7 @@ const (
 	indexWebhookSecret = "webhookSecret"
 
 	buildRunPollInterval = 10 * time.Second
+	errorRequeueInterval = 30 * time.Second
 )
 
 // Reconciler reconciles ImageBuild resources.
@@ -165,11 +166,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if err := r.ensureOnCommitLabel(ctx, imageBuild); err != nil {
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
 	}
 
 	if err := r.ensureWebhookSecret(ctx, imageBuild); err != nil {
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
 	var alreadyOwned *controllerutil.AlreadyOwnedError
@@ -177,7 +178,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	policy := &buildv1alpha1.ImageBuildPolicy{}
 	if err := r.Get(ctx, client.ObjectKey{Name: imageBuildPolicyName}, policy); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
 	present := policy.Spec.ClusterBuildStrategy.BuildFile.Present
@@ -191,14 +192,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.reconcileBuild(ctx, imageBuild, selectedStrategyName); err != nil {
 		if apierrors.IsNotFound(err) {
 			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildStrategyNotFound, err.Error())
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 		}
 		if errors.As(err, &alreadyOwned) {
 			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildConflict, err.Error())
 			return ctrl.Result{}, nil
 		}
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildReconcileFailed, err.Error())
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
 	buildRef := buildNameFor(imageBuild)
@@ -215,7 +216,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	if br, requeueAfter, err := r.reconcileRebuild(ctx, imageBuild); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error())
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	} else if requeueAfter != nil {
 		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
 	} else if br != nil {
@@ -276,7 +277,7 @@ func (r *Reconciler) ensureBuildRun(
 				return nil, &ctrl.Result{}, nil
 			}
 			_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error())
-			return nil, &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			return nil, &ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 		}
 
 		if err := r.recordBuildSpec(imageBuild); err != nil {
