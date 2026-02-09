@@ -46,7 +46,7 @@ func newReconciler(t *testing.T, objs ...client.Object) (*Reconciler, client.Cli
 func newImageBuildPolicy() *buildv1alpha1.ImageBuildPolicy {
 	return &buildv1alpha1.ImageBuildPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: imageBuildPolicyName,
+			Name: policyName,
 		},
 		Spec: buildv1alpha1.ImageBuildPolicySpec{
 			ClusterBuildStrategy: buildv1alpha1.ImageBuildClusterStrategy{

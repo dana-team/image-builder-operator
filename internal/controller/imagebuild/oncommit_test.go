@@ -58,19 +58,19 @@ func TestReconcileRebuild(t *testing.T) {
 			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
 		}
 
-		activeBR := &shipwright.BuildRun{
+		activeBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{Name: activeBuildRunName, Namespace: ib.Namespace},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(ib, activeBR, newScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(ib, activeBuildRun, newScheme(t)))
 
 		policy := newImageBuildPolicy()
-		r, _ := newReconciler(t, policy, ib, activeBR)
+		r, _ := newReconciler(t, policy, ib, activeBuildRun)
 
 		br, requeue, err := r.reconcileRebuild(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br, "should return the active BuildRun for status mapping")
-		require.Equal(t, activeBR.Name, br.Name)
+		require.Equal(t, activeBuildRun.Name, br.Name)
 	})
 
 	t.Run("clears pending when commit already triggered", func(t *testing.T) {

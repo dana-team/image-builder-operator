@@ -28,8 +28,8 @@ func (r *Reconciler) reconcileRebuild(
 		return nil, nil, nil
 	}
 
-	if requeueAfter := requeueAfter(ib); requeueAfter != nil {
-		return nil, requeueAfter, nil
+	if remaining := remainingWait(ib); remaining != nil {
+		return nil, remaining, nil
 	}
 
 	pendingCommit := ib.Status.OnCommit.Pending.CommitSHA
@@ -40,9 +40,9 @@ func (r *Reconciler) reconcileRebuild(
 		return nil, nil, nil
 	}
 
-	activeBR, err := r.getActiveBuildRun(ctx, ib)
-	if err != nil || activeBR != nil {
-		return activeBR, nil, err
+	activeBuildRun, err := r.activeBuildRun(ctx, ib)
+	if err != nil || activeBuildRun != nil {
+		return activeBuildRun, nil, err
 	}
 
 	return r.createBuildRun(ctx, ib, pendingCommit)
@@ -73,9 +73,9 @@ func isRebuildEnabled(ib *buildv1alpha1.ImageBuild) bool {
 		ib.Status.OnCommit.Pending != nil
 }
 
-// requeueAfter returns the remaining wait time if the pending commit is still
+// remainingWait returns the remaining wait time if the pending commit is still
 // within the debounce window or the minimum interval since the last trigger.
-func requeueAfter(ib *buildv1alpha1.ImageBuild) *time.Duration {
+func remainingWait(ib *buildv1alpha1.ImageBuild) *time.Duration {
 	receivedAt := ib.Status.OnCommit.Pending.ReceivedAt.Time
 	if !receivedAt.IsZero() {
 		if remaining := time.Until(receivedAt.Add(onCommitDebounce)); remaining > 0 {
@@ -106,7 +106,7 @@ func (r *Reconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.I
 	return r.Status().Patch(ctx, ib, client.MergeFrom(orig))
 }
 
-func (r *Reconciler) getActiveBuildRun(
+func (r *Reconciler) activeBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {

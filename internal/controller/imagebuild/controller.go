@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	imageBuildControllerName = "ImageBuildController"
-	imageBuildPolicyName     = "image-build-policy"
+	controllerName = "ImageBuildController"
+	policyName     = "image-build-policy"
 
 	indexPushSecret    = "pushSecret"
 	indexCloneSecret   = "cloneSecret"
@@ -96,7 +96,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
 		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.secretWatchPredicate())).
-		Named(imageBuildControllerName).
+		Named(controllerName).
 		Complete(r)
 }
 
@@ -176,7 +176,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var alreadyOwned *controllerutil.AlreadyOwnedError
 
 	policy := &buildv1alpha1.ImageBuildPolicy{}
-	if err := r.Get(ctx, client.ObjectKey{Name: imageBuildPolicyName}, policy); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
 		_ = r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing")
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
