@@ -107,13 +107,13 @@ func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.I
 		return true
 	}
 
-	lastSpecJson, ok := ib.Annotations[annotationKeyLastBuildSpec]
+	lastSpecJSON, ok := ib.Annotations[annotationKeyLastBuildSpec]
 	if !ok {
 		return true
 	}
 
 	var lastInputs buildInputs
-	if err := json.Unmarshal([]byte(lastSpecJson), &lastInputs); err != nil {
+	if err := json.Unmarshal([]byte(lastSpecJSON), &lastInputs); err != nil {
 		logger.Error(err, "Failed to unmarshal last build spec annotation", "ImageBuild", ib.Name)
 		return true
 	}
@@ -147,12 +147,12 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 		Output:    ib.Spec.Output,
 	}
 
-	specJson, err := json.Marshal(inputs)
+	specJSON, err := json.Marshal(inputs)
 	if err != nil {
 		return err
 	}
 
-	ib.Annotations[annotationKeyLastBuildSpec] = string(specJson)
+	ib.Annotations[annotationKeyLastBuildSpec] = string(specJSON)
 	return nil
 }
 

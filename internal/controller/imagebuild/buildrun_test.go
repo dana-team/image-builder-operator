@@ -160,17 +160,17 @@ func TestComputeLatestImage(t *testing.T) {
 	})
 
 	t.Run("no digest, image already tagged => keep spec.output.image", func(t *testing.T) {
-		ib := ib.DeepCopy()
-		ib.Spec.Output.Image = "registry.example.com/team/app:v1"
+		ibCopy := ib.DeepCopy()
+		ibCopy.Spec.Output.Image = "registry.example.com/team/app:v1"
 		br := &shipwright.BuildRun{}
-		require.Equal(t, "registry.example.com/team/app:v1", computeLatestImage(ib, br))
+		require.Equal(t, "registry.example.com/team/app:v1", computeLatestImage(ibCopy, br))
 	})
 
 	t.Run("repo-only image => no-op (empty)", func(t *testing.T) {
-		ib := ib.DeepCopy()
-		ib.Spec.Output.Image = "registry.example.com/team/app"
+		ibCopy := ib.DeepCopy()
+		ibCopy.Spec.Output.Image = "registry.example.com/team/app"
 		br := &shipwright.BuildRun{}
-		require.Equal(t, "", computeLatestImage(ib, br))
+		require.Equal(t, "", computeLatestImage(ibCopy, br))
 	})
 }
 

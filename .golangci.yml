@@ -24,7 +24,11 @@ linters:
     - contextcheck
     - errorlint
     - bodyclose
+    - predeclared
   settings:
+    govet:
+      enable:
+        - shadow
     revive:
       rules:
         - name: comment-spacings
@@ -32,6 +36,8 @@ linters:
         - name: exported
           arguments:
             - checkPrivateReceivers
+        - name: var-naming
+        - name: unexported-return
   exclusions:
     generated: lax
     rules:
