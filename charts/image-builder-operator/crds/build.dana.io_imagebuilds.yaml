@@ -96,8 +96,8 @@ spec:
                     minLength: 1
                     type: string
                   pushSecret:
-                    description: Describes the secret name for pushing a container
-                      image.
+                    description: PushSecret describes the secret name for pushing
+                      a container image.
                     properties:
                       name:
                         default: ""

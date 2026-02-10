@@ -71,7 +71,7 @@ spec:
             - clusterBuildStrategy
             type: object
           status:
-            description: ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy
+            description: ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy.
             type: object
         type: object
     served: true
