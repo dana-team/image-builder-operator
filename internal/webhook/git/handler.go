@@ -1,3 +1,4 @@
+// Package git implements the Git webhook handler for on-commit rebuilds.
 package git
 
 import (

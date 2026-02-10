@@ -1,3 +1,4 @@
+// Package imagebuild implements the ImageBuild controller.
 package imagebuild
 
 import (

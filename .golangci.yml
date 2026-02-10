@@ -28,6 +28,7 @@ linters:
     - bodyclose
     - predeclared
     - wrapcheck
+    - godot
   settings:
     errcheck:
       check-blank: true

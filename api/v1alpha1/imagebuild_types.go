@@ -122,7 +122,7 @@ type ImageBuildOutput struct {
 	Image string `json:"image"`
 
 	// +optional
-	// Describes the secret name for pushing a container image.
+	// PushSecret describes the secret name for pushing a container image.
 	PushSecret *corev1.LocalObjectReference `json:"pushSecret,omitempty"`
 }
 

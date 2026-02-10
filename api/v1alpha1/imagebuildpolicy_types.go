@@ -44,7 +44,7 @@ type ImageBuildFileStrategy struct {
 	Absent string `json:"absent"`
 }
 
-// ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy
+// ImageBuildPolicyStatus defines the observed state of ImageBuildPolicy.
 type ImageBuildPolicyStatus struct{}
 
 // ImageBuildPolicy is the Schema for the ImageBuildPolicies API.
