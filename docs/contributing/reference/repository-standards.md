@@ -23,3 +23,4 @@ Use these standards when contributing to this repository.
 
 - Add or update tests for changed behavior.
 - Keep unit tests behavior-focused and deterministic.
+- Write test names/descriptions around observable behavior and contracts, not internal implementation details.

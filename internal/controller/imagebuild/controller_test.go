@@ -27,6 +27,7 @@ const (
 	testWrongSecretKey    = "wrong-key"
 	testTokenValue        = "my-token"
 	testRevisionV2        = "v2.0.0"
+	testDeletedBuildRun   = "deleted-br"
 )
 
 func TestReconcile(t *testing.T) {
@@ -152,6 +153,25 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, ctrl.Result{}, res)
 		})
 
+		t.Run("continues without error when no BuildRun is available", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			ib.Status.LastBuildRunRef = testDeletedBuildRun
+			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
+
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			r, c := newReconciler(t, ib, policy, strategy)
+
+			res := requireReconcile(t, ctx, r, ib)
+			require.Equal(t, ctrl.Result{}, res)
+
+			latest := requireImageBuild(t, ctx, c, ib)
+			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionTrue, ReasonReconciled)
+		})
+
 		t.Run("reports not ready when Build owned by another ImageBuild", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
@@ -181,6 +201,32 @@ func TestReconcile(t *testing.T) {
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildConflict)
+		})
+
+		t.Run("reports not ready when BuildRun owned by another ImageBuild", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			otherImageBuild := &buildv1alpha1.ImageBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-ib",
+					Namespace: ib.Namespace,
+					UID:       types.UID("other-uid"),
+				},
+			}
+			conflictingBuildRun := newBuildRun(ib, nextBuildRunCounter(ib))
+			require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
+
+			r, c := newReconciler(t, ib, policy, strategy, conflictingBuildRun)
+
+			res := requireReconcile(t, ctx, r, ib)
+			require.Zero(t, res.RequeueAfter)
+
+			latest := requireImageBuild(t, ctx, c, ib)
+			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunConflict)
 		})
 
 		t.Run("reports not ready when on-commit rebuild fails", func(t *testing.T) {
@@ -299,6 +345,61 @@ func TestReconcile(t *testing.T) {
 	})
 }
 
+func TestReconcilePrerequisites(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("proceeds when prerequisites are satisfied", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, _ := newReconciler(t, ib)
+
+		stop, err := r.reconcilePrerequisites(ctx, ib)
+		require.False(t, stop)
+		require.NoError(t, err)
+	})
+
+	t.Run("stops and returns error when label patch fails", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+
+		baseReconciler, baseClient := newReconciler(t, ib)
+		r := &Reconciler{
+			Client: &patchErrorClient{
+				Client: baseClient,
+				err:    errFake,
+			},
+			Scheme: baseReconciler.Scheme,
+		}
+
+		stop, err := r.reconcilePrerequisites(ctx, ib)
+		require.True(t, stop)
+		require.Error(t, err)
+	})
+}
+
+func TestReconcileStatus(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("marks resource ready when ready condition is missing", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, c := newReconciler(t, ib)
+
+		poll, err := r.reconcileStatus(ctx, ib, nil)
+		require.NoError(t, err)
+		require.False(t, poll)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionTrue, ReasonReconciled)
+	})
+
+	t.Run("does not signal poll when build run is nil", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, _ := newReconciler(t, ib)
+
+		poll, err := r.reconcileStatus(ctx, ib, nil)
+		require.NoError(t, err)
+		require.False(t, poll)
+	})
+}
+
 func newWebhookImageBuild(t *testing.T) *buildv1alpha1.ImageBuild {
 	t.Helper()
 
@@ -339,7 +440,7 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 func TestEnsureBuildRun(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("reports not ready when BuildRun owned by another ImageBuild", func(t *testing.T) {
+	t.Run("returns error when BuildRun owned by another ImageBuild", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 
 		otherImageBuild := &buildv1alpha1.ImageBuild{
@@ -352,16 +453,14 @@ func TestEnsureBuildRun(t *testing.T) {
 		conflictingBuildRun := newBuildRun(ib, nextBuildRunCounter(ib))
 		require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
 
-		r, c := newReconciler(t, ib, conflictingBuildRun)
+		r, _ := newReconciler(t, ib, conflictingBuildRun)
 
-		br, result, err := r.ensureBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.Nil(t, br)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.Zero(t, result.RequeueAfter)
+		require.ErrorIs(t, err, errBuildRunFailed)
 
-		latest := requireImageBuild(t, ctx, c, ib)
-		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunConflict)
+		var alreadyOwned *controllerutil.AlreadyOwnedError
+		require.ErrorAs(t, err, &alreadyOwned)
 	})
 
 	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
@@ -378,9 +477,8 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, result, err := r.ensureBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.NoError(t, err)
-		require.Nil(t, result)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
 	})
@@ -392,9 +490,8 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, result, err := r.ensureBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.NoError(t, err)
-		require.Nil(t, result)
 		require.Nil(t, br)
 	})
 }
@@ -412,16 +509,15 @@ func TestEnsureBuild(t *testing.T) {
 		}
 		r, c := newReconciler(t, ib, policy, strategy)
 
-		result := r.ensureBuild(ctx, ib)
-
-		require.Nil(t, result, "expected nil result on success")
+		err := r.ensureBuild(ctx, ib)
+		require.NoError(t, err)
 
 		build := &shipwright.Build{}
 		require.NoError(t, c.Get(ctx, types.NamespacedName{Name: buildNameFor(ib), Namespace: ib.Namespace}, build))
 		require.Equal(t, policy.Spec.ClusterBuildStrategy.BuildFile.Present, build.Spec.Strategy.Name)
 	})
 
-	t.Run("returns early on generic reconcileBuild error", func(t *testing.T) {
+	t.Run("returns error and patches condition on generic reconcileBuild error", func(t *testing.T) {
 		policy := newImageBuildPolicy()
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		strategy := &shipwright.ClusterBuildStrategy{
@@ -440,10 +536,8 @@ func TestEnsureBuild(t *testing.T) {
 			Scheme: s,
 		}
 
-		result := r.ensureBuild(ctx, ib)
-
-		require.NotNil(t, result, "expected non-nil result for early return")
-		require.Equal(t, errorRequeueInterval, result.RequeueAfter)
+		err := r.ensureBuild(ctx, ib)
+		require.Error(t, err)
 
 		latest := &buildv1alpha1.ImageBuild{}
 		require.NoError(t, fc.Get(ctx, client.ObjectKeyFromObject(ib), latest))

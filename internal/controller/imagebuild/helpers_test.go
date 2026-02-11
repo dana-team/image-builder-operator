@@ -152,3 +152,15 @@ func (c *getErrorClient) Get(ctx context.Context, key client.ObjectKey, obj clie
 	}
 	return c.Client.Get(ctx, key, obj, opts...)
 }
+
+type patchErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c *patchErrorClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if _, ok := obj.(*buildv1alpha1.ImageBuild); ok {
+		return c.err
+	}
+	return c.Client.Patch(ctx, obj, patch, opts...)
+}
