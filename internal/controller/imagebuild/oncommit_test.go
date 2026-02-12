@@ -248,112 +248,149 @@ func TestReconcileRebuild(t *testing.T) {
 }
 
 func TestIsRebuildEnabled(t *testing.T) {
-	t.Run("returns false when rebuild nil", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{}
-		require.False(t, isRebuildEnabled(ib))
-	})
-
-	t.Run("returns false when mode not oncommit", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Spec: buildv1alpha1.ImageBuildSpec{
-				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: "manual"},
-			},
-		}
-		require.False(t, isRebuildEnabled(ib))
-	})
-
-	t.Run("returns false when no pending commit", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Spec: buildv1alpha1.ImageBuildSpec{
-				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
-			},
-			Status: buildv1alpha1.ImageBuildStatus{
-				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
-			},
-		}
-		require.False(t, isRebuildEnabled(ib))
-	})
-
-	t.Run("returns true when enabled and pending", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Spec: buildv1alpha1.ImageBuildSpec{
-				Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
-			},
-			Status: buildv1alpha1.ImageBuildStatus{
-				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
-					Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
+	tests := []struct {
+		name     string
+		ib       *buildv1alpha1.ImageBuild
+		expected bool
+	}{
+		{
+			name:     "disabled when rebuild not configured",
+			ib:       &buildv1alpha1.ImageBuild{},
+			expected: false,
+		},
+		{
+			name: "disabled when mode is not oncommit",
+			ib: &buildv1alpha1.ImageBuild{
+				Spec: buildv1alpha1.ImageBuildSpec{
+					Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: "manual"},
 				},
 			},
-		}
-		require.True(t, isRebuildEnabled(ib))
-	})
+			expected: false,
+		},
+		{
+			name: "disabled when no commit is pending",
+			ib: &buildv1alpha1.ImageBuild{
+				Spec: buildv1alpha1.ImageBuildSpec{
+					Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
+				},
+				Status: buildv1alpha1.ImageBuildStatus{
+					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "enabled when oncommit mode set and commit pending",
+			ib: &buildv1alpha1.ImageBuild{
+				Spec: buildv1alpha1.ImageBuildSpec{
+					Rebuild: &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
+				},
+				Status: buildv1alpha1.ImageBuildStatus{
+					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+						Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, isRebuildEnabled(tt.ib))
+		})
+	}
 }
 
 func TestIsDuplicateCommit(t *testing.T) {
-	t.Run("returns false when no last triggered", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Status: buildv1alpha1.ImageBuildStatus{
-				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
-			},
-		}
-		require.False(t, isDuplicateCommit(ib, testCommitSHA))
-	})
-
-	t.Run("returns false when different commit", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Status: buildv1alpha1.ImageBuildStatus{
-				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
-					LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: differentCommitSHA},
+	tests := []struct {
+		name     string
+		ib       *buildv1alpha1.ImageBuild
+		expected bool
+	}{
+		{
+			name: "not duplicate when no previous build was triggered",
+			ib: &buildv1alpha1.ImageBuild{
+				Status: buildv1alpha1.ImageBuildStatus{
+					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{},
 				},
 			},
-		}
-		require.False(t, isDuplicateCommit(ib, testCommitSHA))
-	})
-
-	t.Run("returns true when same commit", func(t *testing.T) {
-		ib := &buildv1alpha1.ImageBuild{
-			Status: buildv1alpha1.ImageBuildStatus{
-				OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
-					LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: testCommitSHA},
+			expected: false,
+		},
+		{
+			name: "not duplicate when commit SHA differs",
+			ib: &buildv1alpha1.ImageBuild{
+				Status: buildv1alpha1.ImageBuildStatus{
+					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+						LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: differentCommitSHA},
+					},
 				},
 			},
-		}
-		require.True(t, isDuplicateCommit(ib, testCommitSHA))
-	})
+			expected: false,
+		},
+		{
+			name: "duplicate when commit SHA matches",
+			ib: &buildv1alpha1.ImageBuild{
+				Status: buildv1alpha1.ImageBuildStatus{
+					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
+						LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: testCommitSHA},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, isDuplicateCommit(tt.ib, testCommitSHA))
+		})
+	}
 }
 
 func TestIsActiveBuildRun(t *testing.T) {
-	t.Run("returns true when condition nil", func(t *testing.T) {
-		br := &shipwright.BuildRun{}
-		require.True(t, isActiveBuildRun(br))
-	})
+	tests := []struct {
+		name           string
+		conditionSetup func(br *shipwright.BuildRun)
+		expected       bool
+	}{
+		{
+			name:           "active when build run has no status yet",
+			conditionSetup: nil,
+			expected:       true,
+		},
+		{
+			name: "inactive after build run succeeds",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionTrue})
+			},
+			expected: false,
+		},
+		{
+			name: "inactive after build run fails",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionFalse})
+			},
+			expected: false,
+		},
+		{
+			name: "active while build run is in progress",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionUnknown})
+			},
+			expected: true,
+		},
+	}
 
-	t.Run("returns false when succeeded", func(t *testing.T) {
-		br := &shipwright.BuildRun{}
-		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionTrue,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			br := &shipwright.BuildRun{}
+			if tt.conditionSetup != nil {
+				tt.conditionSetup(br)
+			}
+			require.Equal(t, tt.expected, isActiveBuildRun(br))
 		})
-		require.False(t, isActiveBuildRun(br))
-	})
-
-	t.Run("returns false when failed", func(t *testing.T) {
-		br := &shipwright.BuildRun{}
-		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionFalse,
-		})
-		require.False(t, isActiveBuildRun(br))
-	})
-
-	t.Run("returns true when running", func(t *testing.T) {
-		br := &shipwright.BuildRun{}
-		br.Status.Conditions = append(br.Status.Conditions, shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionUnknown,
-		})
-		require.True(t, isActiveBuildRun(br))
-	})
+	}
 }
 
 func TestClearPendingCommit(t *testing.T) {

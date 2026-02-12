@@ -77,7 +77,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		require.ErrorAs(t, err, &alreadyOwned, "Should return AlreadyOwnedError when BuildRun has different owner")
 	})
 
-	t.Run("returns error when Get fails", func(t *testing.T) {
+	t.Run("returns error when build run lookup fails", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 		r.Client = &getErrorClient{Client: r.Client, err: errFake}
@@ -91,32 +91,57 @@ func TestReconcileBuildRun(t *testing.T) {
 func TestPatchBuildSucceededCondition(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("Succeeded condition missing => Pending/Unknown", func(t *testing.T) {
-		br := newTestBuildRun(t)
-		requireBuildSucceeded(t, ctx, br, metav1.ConditionUnknown, ReasonBuildRunPending)
-	})
+	tests := []struct {
+		name           string
+		conditionSetup func(br *shipwright.BuildRun)
+		expectedStatus metav1.ConditionStatus
+		expectedReason string
+	}{
+		{
+			name:           "reports pending when build run has no status",
+			conditionSetup: nil,
+			expectedStatus: metav1.ConditionUnknown,
+			expectedReason: ReasonBuildRunPending,
+		},
+		{
+			name: "reports succeeded when build run completes",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionTrue})
+			},
+			expectedStatus: metav1.ConditionTrue,
+			expectedReason: ReasonBuildRunSucceeded,
+		},
+		{
+			name: "reports failed when build run fails",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionFalse})
+			},
+			expectedStatus: metav1.ConditionFalse,
+			expectedReason: ReasonBuildRunFailed,
+		},
+		{
+			name: "reports running when build run is in progress",
+			conditionSetup: func(br *shipwright.BuildRun) {
+				br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionUnknown})
+			},
+			expectedStatus: metav1.ConditionUnknown,
+			expectedReason: ReasonBuildRunRunning,
+		},
+	}
 
-	t.Run("Succeeded=True => Succeeded/True", func(t *testing.T) {
-		br := newTestBuildRun(t)
-		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionTrue})
-		requireBuildSucceeded(t, ctx, br, metav1.ConditionTrue, ReasonBuildRunSucceeded)
-	})
-
-	t.Run("Succeeded=False => Failed/False", func(t *testing.T) {
-		br := newTestBuildRun(t)
-		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionFalse})
-		requireBuildSucceeded(t, ctx, br, metav1.ConditionFalse, ReasonBuildRunFailed)
-	})
-
-	t.Run("Succeeded=Unknown => Running/Unknown", func(t *testing.T) {
-		br := newTestBuildRun(t)
-		br.Status.SetCondition(&shipwright.Condition{Type: shipwright.Succeeded, Status: corev1.ConditionUnknown})
-		requireBuildSucceeded(t, ctx, br, metav1.ConditionUnknown, ReasonBuildRunRunning)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			br := newTestBuildRun(t)
+			if tt.conditionSetup != nil {
+				tt.conditionSetup(br)
+			}
+			requireBuildSucceeded(t, ctx, br, tt.expectedStatus, tt.expectedReason)
+		})
+	}
 }
 
 func TestDeriveBuildSucceededStatus(t *testing.T) {
-	t.Run("Succeeded=False => includes BuildRun message", func(t *testing.T) {
+	t.Run("includes failure details when build run fails", func(t *testing.T) {
 		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{
 			Type:    shipwright.Succeeded,
@@ -132,7 +157,7 @@ func TestDeriveBuildSucceededStatus(t *testing.T) {
 		require.Contains(t, message, "step failed")
 	})
 
-	t.Run("Succeeded=Unknown => includes BuildRun message", func(t *testing.T) {
+	t.Run("includes status details when build run is in progress", func(t *testing.T) {
 		br := newTestBuildRun(t)
 		br.Status.SetCondition(&shipwright.Condition{
 			Type:    shipwright.Succeeded,
@@ -152,20 +177,20 @@ func TestDeriveBuildSucceededStatus(t *testing.T) {
 func TestComputeLatestImage(t *testing.T) {
 	ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 
-	t.Run("digest present => image@digest", func(t *testing.T) {
+	t.Run("appends digest when build output has a digest", func(t *testing.T) {
 		br := &shipwright.BuildRun{}
 		br.Status.Output = &shipwright.Output{Digest: "sha256:abc"}
 		require.Equal(t, ib.Spec.Output.Image+"@sha256:abc", computeLatestImage(ib, br))
 	})
 
-	t.Run("no digest, image already tagged => keep spec.output.image", func(t *testing.T) {
+	t.Run("keeps tagged image when no digest is present", func(t *testing.T) {
 		ibCopy := ib.DeepCopy()
 		ibCopy.Spec.Output.Image = "registry.example.com/team/app:v1"
 		br := &shipwright.BuildRun{}
 		require.Equal(t, "registry.example.com/team/app:v1", computeLatestImage(ibCopy, br))
 	})
 
-	t.Run("repo-only image => no-op (empty)", func(t *testing.T) {
+	t.Run("returns empty when image has no tag or digest", func(t *testing.T) {
 		ibCopy := ib.DeepCopy()
 		ibCopy.Spec.Output.Image = "registry.example.com/team/app"
 		br := &shipwright.BuildRun{}
@@ -174,28 +199,30 @@ func TestComputeLatestImage(t *testing.T) {
 }
 
 func TestHasTagOrDigest(t *testing.T) {
-	t.Run("invalid image name => false", func(t *testing.T) {
-		require.False(t, hasTagOrDigest("not a valid image@@@"))
-	})
+	digest := sha256.Sum256([]byte("digest"))
 
-	t.Run("tagged image => true", func(t *testing.T) {
-		require.True(t, hasTagOrDigest("registry.example.com/team/app:v1"))
-	})
+	tests := []struct {
+		name     string
+		image    string
+		expected bool
+	}{
+		{name: "returns false for invalid image reference", image: "not a valid image@@@", expected: false},
+		{name: "returns true when image has a tag", image: "registry.example.com/team/app:v1", expected: true},
+		{name: "returns true when image has a digest", image: "registry.example.com/team/app@sha256:" + fmt.Sprintf("%x", digest), expected: true},
+		{name: "returns false when image has no tag or digest", image: "registry.example.com/team/app", expected: false},
+	}
 
-	t.Run("digest image => true", func(t *testing.T) {
-		digest := sha256.Sum256([]byte("digest"))
-		require.True(t, hasTagOrDigest("registry.example.com/team/app@sha256:"+fmt.Sprintf("%x", digest)))
-	})
-
-	t.Run("name-only image => false", func(t *testing.T) {
-		require.False(t, hasTagOrDigest("registry.example.com/team/app"))
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, hasTagOrDigest(tt.image))
+		})
+	}
 }
 
 func TestPatchLatestImage(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("empty latest image => no-op", func(t *testing.T) {
+	t.Run("skips patch when latest image is empty", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 
@@ -205,7 +232,7 @@ func TestPatchLatestImage(t *testing.T) {
 		require.Zero(t, ib.Status.ObservedGeneration)
 	})
 
-	t.Run("latest image set => patch status", func(t *testing.T) {
+	t.Run("patches status when latest image is set", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 		latest := "registry.example.com/team/app@sha256:abc"
@@ -222,14 +249,14 @@ func TestIsNewBuildRequired(t *testing.T) {
 	const testBuildRunName = "some-buildrun"
 	const testSecretName = "push-secret"
 
-	t.Run("no previous build => required", func(t *testing.T) {
+	t.Run("required when no previous build exists", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 
 		require.True(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("no annotation => required", func(t *testing.T) {
+	t.Run("required when previous build spec is not recorded", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 		r, _ := newReconciler(t, ib)
@@ -237,7 +264,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.True(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("build inputs unchanged => not required", func(t *testing.T) {
+	t.Run("not required when build inputs are unchanged", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 		r, _ := newReconciler(t, ib)
@@ -247,43 +274,29 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("git URL changed => required", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
-		r, _ := newReconciler(t, ib)
+	fieldChangeTests := []struct {
+		name   string
+		mutate func(ib *buildv1alpha1.ImageBuild)
+	}{
+		{name: "requires new build when git URL changes", mutate: func(ib *buildv1alpha1.ImageBuild) { ib.Spec.Source.Git.URL = "https://github.com/other/repo" }},
+		{name: "requires new build when git revision changes", mutate: func(ib *buildv1alpha1.ImageBuild) { ib.Spec.Source.Git.Revision = "develop" }},
+		{name: "requires new build when output image changes", mutate: func(ib *buildv1alpha1.ImageBuild) { ib.Spec.Output.Image = "registry.example.com/other/image" }},
+	}
 
-		require.NoError(t, r.recordBuildSpec(ib))
+	for _, tt := range fieldChangeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			ib.Status.LastBuildRunRef = testBuildRunName
+			r, _ := newReconciler(t, ib)
 
-		ib.Spec.Source.Git.URL = "https://github.com/other/repo"
+			require.NoError(t, r.recordBuildSpec(ib))
+			tt.mutate(ib)
 
-		require.True(t, r.isNewBuildRequired(ctx, ib))
-	})
+			require.True(t, r.isNewBuildRequired(ctx, ib))
+		})
+	}
 
-	t.Run("git revision changed => required", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
-		r, _ := newReconciler(t, ib)
-
-		require.NoError(t, r.recordBuildSpec(ib))
-
-		ib.Spec.Source.Git.Revision = "develop"
-
-		require.True(t, r.isNewBuildRequired(ctx, ib))
-	})
-
-	t.Run("output image changed => required", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
-		r, _ := newReconciler(t, ib)
-
-		require.NoError(t, r.recordBuildSpec(ib))
-
-		ib.Spec.Output.Image = "registry.example.com/other/image"
-
-		require.True(t, r.isNewBuildRequired(ctx, ib))
-	})
-
-	t.Run("onCommit field added => not required", func(t *testing.T) {
+	t.Run("not required when only onCommit field is added", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 		r, _ := newReconciler(t, ib)
@@ -300,7 +313,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("rebuild mode changed => not required", func(t *testing.T) {
+	t.Run("not required when only rebuild mode changes", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 		r, _ := newReconciler(t, ib)
@@ -312,7 +325,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("secret now available => retry", func(t *testing.T) {
+	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
 		ib.Status.LastBuildRunRef = testBuildRunName
@@ -342,7 +355,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.True(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("secret still missing => no retry", func(t *testing.T) {
+	t.Run("does not retry when secret is still missing", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
 		ib.Status.LastBuildRunRef = testBuildRunName
@@ -365,7 +378,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		require.False(t, r.isNewBuildRequired(ctx, ib))
 	})
 
-	t.Run("other error => no retry", func(t *testing.T) {
+	t.Run("does not retry for non-registration errors", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 
