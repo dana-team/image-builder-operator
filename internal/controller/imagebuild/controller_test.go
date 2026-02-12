@@ -2,6 +2,7 @@ package imagebuild
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -275,7 +276,7 @@ func TestReconcile(t *testing.T) {
 			r, c := newReconciler(t, ib, policy, strategy, webhookSecret, conflictingBuildRun)
 
 			res := requireReconcile(t, ctx, r, ib)
-			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
+			require.Zero(t, res.RequeueAfter, "AlreadyOwnedError is permanent; no scheduled requeue")
 
 			latest := requireImageBuild(t, ctx, c, ib)
 			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunReconcileFailed)
@@ -398,6 +399,79 @@ func TestReconcileStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, poll)
 	})
+}
+
+func TestResolveBuildRun(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("reports not ready when rebuild fails", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+		ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
+			WebhookSecretRef: corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
+				Key:                  testWebhookSecretKey,
+			},
+		}
+		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: "abc123"},
+		}
+
+		otherImageBuild := &buildv1alpha1.ImageBuild{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-ib",
+				Namespace: ib.Namespace,
+				UID:       types.UID("other-uid"),
+			},
+		}
+		conflictingBuildRun := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, 1),
+				Namespace: ib.Namespace,
+			},
+		}
+		require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
+
+		webhookSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testWebhookSecretName,
+				Namespace: ib.Namespace,
+			},
+			Data: map[string][]byte{
+				testWebhookSecretKey: []byte(testTokenValue),
+			},
+		}
+
+		r, c := newReconciler(t, ib, webhookSecret, conflictingBuildRun)
+
+		br, requeue, err := r.resolveBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.Nil(t, requeue)
+		require.ErrorIs(t, err, errBuildRunFailed)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunReconcileFailed)
+	})
+
+	t.Run("propagates unexpected errors without status update", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.LastBuildRunRef = "some-br"
+		require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
+
+		r, c := newReconciler(t, ib)
+		r.Client = &getErrorClient{Client: r.Client, err: errFake}
+
+		br, requeue, err := r.resolveBuildRun(ctx, ib)
+		require.Nil(t, br)
+		require.Nil(t, requeue)
+		require.Error(t, err)
+		require.False(t, errors.Is(err, errBuildRunFailed))
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.Empty(t, latest.Status.Conditions, "no condition should be patched for unexpected errors")
+	})
+
 }
 
 func newWebhookImageBuild(t *testing.T) *buildv1alpha1.ImageBuild {

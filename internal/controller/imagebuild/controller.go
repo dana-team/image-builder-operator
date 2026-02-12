@@ -201,37 +201,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	var buildRun *shipwright.BuildRun
-	if br, requeueAfter, err := r.reconcileRebuild(ctx, imageBuild); err != nil {
-		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
+	buildRun, requeueAfter, err := r.resolveBuildRun(ctx, imageBuild)
+	if err != nil {
+		if !errors.Is(err, errBuildRunFailed) {
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
-	} else if requeueAfter != nil {
-		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
-	} else if br != nil {
-		buildRun = br
+		requeue := errorRequeueInterval
+		var alreadyOwned *controllerutil.AlreadyOwnedError
+		if errors.As(err, &alreadyOwned) {
+			requeue = 0
+		}
+		return ctrl.Result{RequeueAfter: requeue}, nil
 	}
-
-	if buildRun == nil {
-		br, err := r.ensureBuildRun(ctx, imageBuild)
-		if err != nil {
-			if !errors.Is(err, errBuildRunFailed) {
-				return ctrl.Result{}, err
-			}
-			var alreadyOwned *controllerutil.AlreadyOwnedError
-			reason := ReasonBuildRunReconcileFailed
-			requeue := errorRequeueInterval
-			if errors.As(err, &alreadyOwned) {
-				reason = ReasonBuildRunConflict
-				requeue = 0
-			}
-			if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, reason, err.Error()); patchErr != nil {
-				logger.Error(patchErr, "failed to patch Ready condition")
-			}
-			return ctrl.Result{RequeueAfter: requeue}, nil
-		}
-		buildRun = br
+	if requeueAfter != nil {
+		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
 	}
 
 	poll, err := r.reconcileStatus(ctx, imageBuild, buildRun)
@@ -368,6 +351,43 @@ func (r *Reconciler) ensureBuildRun(
 	}
 
 	return nil, nil
+}
+
+// resolveBuildRun resolves the active or required BuildRun for the given ImageBuild.
+// It tries on-commit rebuild first, then falls back to spec-change BuildRun creation.
+// On failure it patches the Ready condition with the appropriate reason.
+func (r *Reconciler) resolveBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+) (*shipwright.BuildRun, *time.Duration, error) {
+	logger := log.FromContext(ctx)
+
+	if buildRun, requeueAfter, err := r.reconcileRebuild(ctx, ib); err != nil {
+		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
+		return nil, nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
+	} else if requeueAfter != nil || buildRun != nil {
+		return buildRun, requeueAfter, nil
+	}
+
+	buildRun, err := r.ensureBuildRun(ctx, ib)
+	if err != nil {
+		if !errors.Is(err, errBuildRunFailed) {
+			return nil, nil, err
+		}
+		reason := ReasonBuildRunReconcileFailed
+		var alreadyOwned *controllerutil.AlreadyOwnedError
+		if errors.As(err, &alreadyOwned) {
+			reason = ReasonBuildRunConflict
+		}
+		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, reason, err.Error()); patchErr != nil {
+			logger.Error(patchErr, "failed to patch Ready condition")
+		}
+		return nil, nil, err
+	}
+
+	return buildRun, nil, nil
 }
 
 func (r *Reconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
