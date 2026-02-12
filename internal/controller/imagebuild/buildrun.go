@@ -116,7 +116,7 @@ func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.I
 		return true
 	}
 
-	lastSpecJSON, ok := ib.Annotations[annotationKeyLastBuildSpec]
+	lastSpecJSON, ok := ib.Annotations[buildv1alpha1.AnnotationKeyLastBuildSpec]
 	if !ok {
 		return true
 	}
@@ -161,7 +161,7 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 		return fmt.Errorf("failed to marshal build spec annotation: %w", err)
 	}
 
-	ib.Annotations[annotationKeyLastBuildSpec] = string(specJSON)
+	ib.Annotations[buildv1alpha1.AnnotationKeyLastBuildSpec] = string(specJSON)
 	return nil
 }
 
@@ -255,7 +255,7 @@ func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildR
 			Name:      buildRunNameFor(ib, counter),
 			Namespace: ib.Namespace,
 			Labels: map[string]string{
-				labelKeyParentImageBuild: ib.Name,
+				buildv1alpha1.LabelKeyParentImageBuild: ib.Name,
 			},
 		},
 		Spec: shipwright.BuildRunSpec{

@@ -19,8 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const labelKeyOnCommitEnabled = "build.dana.io/oncommit-enabled"
-
 // Sentinel errors for webhook handling.
 var (
 	errMethodNotAllowed        = errors.New("method not allowed")
@@ -55,7 +53,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var list buildv1alpha1.ImageBuildList
-	if err := h.Client.List(ctx, &list, client.MatchingLabels{labelKeyOnCommitEnabled: "true"}); err != nil {
+	if err := h.Client.List(ctx, &list, client.MatchingLabels{buildv1alpha1.LabelKeyOnCommitEnabled: "true"}); err != nil {
 		logger.Error(err, "failed to list imagebuilds")
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

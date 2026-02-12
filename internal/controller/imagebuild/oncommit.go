@@ -57,12 +57,12 @@ func (r *Reconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.
 	if ib.Labels == nil {
 		ib.Labels = map[string]string{}
 	}
-	if ib.Labels[labelKeyOnCommitEnabled] == desired {
+	if ib.Labels[buildv1alpha1.LabelKeyOnCommitEnabled] == desired {
 		return nil
 	}
 
 	orig := ib.DeepCopy()
-	ib.Labels[labelKeyOnCommitEnabled] = desired
+	ib.Labels[buildv1alpha1.LabelKeyOnCommitEnabled] = desired
 
 	if err := r.Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
 		return fmt.Errorf("failed to patch oncommit label: %w", err)
@@ -157,7 +157,7 @@ func (r *Reconciler) createBuildRun(
 	counter := nextTriggerCounter(ib)
 	br := newBuildRun(ib, counter)
 	br.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	br.Labels[labelKeyBuildTrigger] = "oncommit"
+	br.Labels[buildv1alpha1.LabelKeyBuildTrigger] = "oncommit"
 
 	existing := &shipwright.BuildRun{}
 	key := client.ObjectKeyFromObject(br)

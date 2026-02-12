@@ -71,7 +71,7 @@ func (r *Reconciler) newBuild(
 			Name:      buildNameFor(ib),
 			Namespace: ib.Namespace,
 			Labels: map[string]string{
-				labelKeyParentImageBuild: ib.Name,
+				buildv1alpha1.LabelKeyParentImageBuild: ib.Name,
 			},
 		},
 		Spec: shipwright.BuildSpec{
