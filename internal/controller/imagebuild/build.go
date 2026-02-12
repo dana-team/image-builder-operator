@@ -136,6 +136,23 @@ func (r *Reconciler) patchReadyCondition(
 	return nil
 }
 
+func (r *Reconciler) patchBuildRef(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	buildRef := buildNameFor(ib)
+	if ib.Status.BuildRef == buildRef && ib.Status.ObservedGeneration == ib.Generation {
+		return nil
+	}
+
+	orig := ib.DeepCopy()
+	ib.Status.ObservedGeneration = ib.Generation
+	ib.Status.BuildRef = buildRef
+
+	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch ImageBuild status: %w", err)
+	}
+
+	return nil
+}
+
 func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
 	return ib.Name + "-build"
 }

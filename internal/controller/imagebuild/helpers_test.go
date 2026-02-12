@@ -164,3 +164,22 @@ func (c *patchErrorClient) Patch(ctx context.Context, obj client.Object, patch c
 	}
 	return c.Client.Patch(ctx, obj, patch, opts...)
 }
+
+// statusPatchErrorClient injects errors on status sub-resource Patch calls.
+type statusPatchErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c *statusPatchErrorClient) Status() client.SubResourceWriter {
+	return &errorStatusWriter{SubResourceWriter: c.Client.Status(), err: c.err}
+}
+
+type errorStatusWriter struct {
+	client.SubResourceWriter
+	err error
+}
+
+func (w *errorStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return w.err
+}

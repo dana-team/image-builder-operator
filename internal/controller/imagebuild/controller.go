@@ -191,14 +191,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
-	buildRef := buildNameFor(imageBuild)
-	if imageBuild.Status.BuildRef != buildRef || imageBuild.Status.ObservedGeneration != imageBuild.Generation {
-		orig := imageBuild.DeepCopy()
-		imageBuild.Status.ObservedGeneration = imageBuild.Generation
-		imageBuild.Status.BuildRef = buildRef
-		if err := r.Status().Patch(ctx, imageBuild, client.MergeFrom(orig)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to patch ImageBuild status: %w", err)
-		}
+	if err := r.patchBuildRef(ctx, imageBuild); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	buildRun, requeueAfter, err := r.resolveBuildRun(ctx, imageBuild)

@@ -95,21 +95,6 @@ func TestReconcile(t *testing.T) {
 	})
 
 	t.Run("status tracking", func(t *testing.T) {
-		t.Run("tracks observed generation and associated build", func(t *testing.T) {
-			policy := newImageBuildPolicy()
-			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
-			}
-			r, c := newReconciler(t, ib, policy, strategy)
-
-			requireReconcile(t, ctx, r, ib)
-
-			latest := requireImageBuild(t, ctx, c, ib)
-			require.Equal(t, ib.Generation, latest.Status.ObservedGeneration)
-			require.Equal(t, buildNameFor(ib), latest.Status.BuildRef)
-		})
-
 		t.Run("reflects spec changes across reconciliations", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())

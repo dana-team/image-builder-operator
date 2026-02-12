@@ -195,6 +195,72 @@ func TestReconcileBuild(t *testing.T) {
 	})
 }
 
+func TestPatchBuildRef(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("updates status on first reconcile", func(t *testing.T) {
+		ib := newImageBuild(testImageBuildName, testNamespace)
+		ib.Generation = 3
+		r, c := newReconciler(t, ib)
+
+		err := r.patchBuildRef(ctx, ib)
+		require.NoError(t, err)
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.Equal(t, buildNameFor(ib), latest.Status.BuildRef)
+		require.Equal(t, int64(3), latest.Status.ObservedGeneration)
+	})
+
+	t.Run("updates status when generation changes", func(t *testing.T) {
+		ib := newImageBuild(testImageBuildName, testNamespace)
+		ib.Generation = 2
+		ib.Status.BuildRef = buildNameFor(ib)
+		ib.Status.ObservedGeneration = 1
+		r, c := newReconciler(t, ib)
+
+		err := r.patchBuildRef(ctx, ib)
+		require.NoError(t, err)
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.Equal(t, int64(2), latest.Status.ObservedGeneration)
+	})
+
+	t.Run("skips update when status is current", func(t *testing.T) {
+		ib := newImageBuild(testImageBuildName, testNamespace)
+		ib.Generation = 1
+		ib.Status.BuildRef = buildNameFor(ib)
+		ib.Status.ObservedGeneration = 1
+		r, c := newReconciler(t, ib)
+
+		err := r.patchBuildRef(ctx, ib)
+		require.NoError(t, err)
+
+		latest := &buildv1alpha1.ImageBuild{}
+		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
+		require.Equal(t, buildNameFor(ib), latest.Status.BuildRef)
+		require.Equal(t, int64(1), latest.Status.ObservedGeneration)
+	})
+
+	t.Run("returns error when status update fails", func(t *testing.T) {
+		ib := newImageBuild(testImageBuildName, testNamespace)
+
+		baseReconciler, baseClient := newReconciler(t, ib)
+		r := &Reconciler{
+			Client: &statusPatchErrorClient{
+				Client: baseClient,
+				err:    errFake,
+			},
+			Scheme: baseReconciler.Scheme,
+		}
+
+		err := r.patchBuildRef(ctx, ib)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to patch ImageBuild status")
+	})
+}
+
 func TestPatchReadyCondition(t *testing.T) {
 	const testReadyMessage = "All good"
 
