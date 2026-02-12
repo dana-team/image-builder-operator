@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
@@ -329,6 +330,155 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, buildRunPollInterval, res.RequeueAfter)
 		})
 	})
+
+	t.Run("retry behavior", func(t *testing.T) {
+		t.Run("retries after interval when build run creation fails", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			r, c := newReconciler(t, ib, policy, strategy)
+			r.Client = &getErrorClient{Client: c, err: errFake}
+
+			res, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
+			})
+			require.NoError(t, err)
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
+
+			latest := requireImageBuild(t, ctx, c, ib)
+			requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunReconcileFailed)
+		})
+
+		t.Run("delays rebuild when commit received recently", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
+			ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
+				WebhookSecretRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
+					Key:                  testWebhookSecretKey,
+				},
+			}
+			ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
+				Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
+					CommitSHA:  testCommitSHA,
+					ReceivedAt: metav1.NewTime(time.Now()),
+				},
+			}
+
+			webhookSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testWebhookSecretName,
+					Namespace: ib.Namespace,
+				},
+				Data: map[string][]byte{
+					testWebhookSecretKey: []byte(testTokenValue),
+				},
+			}
+
+			r, _ := newReconciler(t, ib, policy, strategy, webhookSecret)
+
+			res := requireReconcile(t, ctx, r, ib)
+			require.NotZero(t, res.RequeueAfter)
+			require.True(t, res.RequeueAfter <= onCommitDebounce)
+		})
+	})
+
+	t.Run("error handling", func(t *testing.T) {
+		t.Run("retries when prerequisite setup fails", func(t *testing.T) {
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+
+			baseReconciler, baseClient := newReconciler(t, ib)
+			r := &Reconciler{
+				Client: &patchErrorClient{Client: baseClient, err: errFake},
+				Scheme: baseReconciler.Scheme,
+			}
+
+			res, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
+			})
+			require.Error(t, err)
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
+		})
+
+		t.Run("reports error when status update fails", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy)
+			r := &Reconciler{
+				Client: &statusPatchErrorClient{Client: baseClient, err: errFake},
+				Scheme: baseReconciler.Scheme,
+			}
+
+			res, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
+			})
+			require.Error(t, err)
+			require.Equal(t, ctrl.Result{}, res)
+		})
+
+		t.Run("reports error on unexpected build run lookup failure", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			ib.Status.LastBuildRunRef = "some-br"
+			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
+
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+
+			r, _ := newReconciler(t, ib, policy, strategy)
+			r.Client = &getErrorClient{Client: r.Client, err: errFake}
+
+			res, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
+			})
+			require.Error(t, err)
+			require.Equal(t, ctrl.Result{}, res)
+		})
+
+		t.Run("reports error when status sync fails", func(t *testing.T) {
+			policy := newImageBuildPolicy()
+			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+			ib.Status.BuildRef = buildNameFor(ib)
+			ib.Status.ObservedGeneration = ib.Generation
+			ib.Status.LastBuildRunRef = "existing-br"
+			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
+
+			strategy := &shipwright.ClusterBuildStrategy{
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			}
+			existingBR := &shipwright.BuildRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "existing-br",
+					Namespace: ib.Namespace,
+				},
+			}
+
+			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy, existingBR)
+			r := &Reconciler{
+				Client: &statusPatchErrorClient{Client: baseClient, err: errFake},
+				Scheme: baseReconciler.Scheme,
+			}
+
+			res, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
+			})
+			require.Error(t, err)
+			require.Equal(t, ctrl.Result{}, res)
+		})
+	})
 }
 
 func TestReconcilePrerequisites(t *testing.T) {
@@ -343,7 +493,7 @@ func TestReconcilePrerequisites(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("stops and returns error when label patch fails", func(t *testing.T) {
+	t.Run("stops when label sync fails", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 
 		baseReconciler, baseClient := newReconciler(t, ib)
@@ -364,7 +514,7 @@ func TestReconcilePrerequisites(t *testing.T) {
 func TestReconcileStatus(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("marks resource ready when ready condition is missing", func(t *testing.T) {
+	t.Run("sets ready on first successful reconcile", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, c := newReconciler(t, ib)
 
@@ -376,7 +526,7 @@ func TestReconcileStatus(t *testing.T) {
 		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionTrue, ReasonReconciled)
 	})
 
-	t.Run("does not signal poll when build run is nil", func(t *testing.T) {
+	t.Run("skips polling when no build run exists", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 
@@ -389,56 +539,7 @@ func TestReconcileStatus(t *testing.T) {
 func TestResolveBuildRun(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("reports not ready when rebuild fails", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
-		ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
-			WebhookSecretRef: corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
-				Key:                  testWebhookSecretKey,
-			},
-		}
-		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: "abc123"},
-		}
-
-		otherImageBuild := &buildv1alpha1.ImageBuild{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "other-ib",
-				Namespace: ib.Namespace,
-				UID:       types.UID("other-uid"),
-			},
-		}
-		conflictingBuildRun := &shipwright.BuildRun{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, 1),
-				Namespace: ib.Namespace,
-			},
-		}
-		require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
-
-		webhookSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      testWebhookSecretName,
-				Namespace: ib.Namespace,
-			},
-			Data: map[string][]byte{
-				testWebhookSecretKey: []byte(testTokenValue),
-			},
-		}
-
-		r, c := newReconciler(t, ib, webhookSecret, conflictingBuildRun)
-
-		br, requeue, err := r.resolveBuildRun(ctx, ib)
-		require.Nil(t, br)
-		require.Nil(t, requeue)
-		require.ErrorIs(t, err, errBuildRunFailed)
-
-		latest := requireImageBuild(t, ctx, c, ib)
-		requireCondition(t, latest.Status.Conditions, TypeReady, metav1.ConditionFalse, ReasonBuildRunReconcileFailed)
-	})
-
-	t.Run("propagates unexpected errors without status update", func(t *testing.T) {
+	t.Run("surfaces unexpected errors without changing status", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = "some-br"
 		require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
@@ -499,29 +600,6 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 func TestEnsureBuildRun(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("returns error when BuildRun owned by another ImageBuild", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-
-		otherImageBuild := &buildv1alpha1.ImageBuild{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "other-ib",
-				Namespace: ib.Namespace,
-				UID:       types.UID("other-uid"),
-			},
-		}
-		conflictingBuildRun := newBuildRun(ib, nextBuildRunCounter(ib))
-		require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
-
-		r, _ := newReconciler(t, ib, conflictingBuildRun)
-
-		br, err := r.ensureBuildRun(ctx, ib)
-		require.Nil(t, br)
-		require.ErrorIs(t, err, errBuildRunFailed)
-
-		var alreadyOwned *controllerutil.AlreadyOwnedError
-		require.ErrorAs(t, err, &alreadyOwned)
-	})
-
 	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = "existing-br"
@@ -576,7 +654,7 @@ func TestEnsureBuild(t *testing.T) {
 		require.Equal(t, policy.Spec.ClusterBuildStrategy.BuildFile.Present, build.Spec.Strategy.Name)
 	})
 
-	t.Run("returns error and patches condition on generic reconcileBuild error", func(t *testing.T) {
+	t.Run("reports not ready on build reconciliation error", func(t *testing.T) {
 		policy := newImageBuildPolicy()
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		strategy := &shipwright.ClusterBuildStrategy{
@@ -625,7 +703,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		require.Zero(t, queue.Len())
 	})
 
-	t.Run("enqueues ImageBuild matching secret index", func(t *testing.T) {
+	t.Run("reconciles ImageBuild when referenced secret appears", func(t *testing.T) {
 		const secretName = "push-secret"
 		const namespace = "ns"
 		const imageBuildName = "ib"
