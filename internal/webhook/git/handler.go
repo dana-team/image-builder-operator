@@ -25,8 +25,7 @@ var (
 	errUnsupportedWebhook      = errors.New("unsupported webhook event: only GitHub and GitLab push events are supported")
 	errMissingOnCommit         = errors.New("missing spec.onCommit")
 	errMissingWebhookSecretKey = errors.New("missing key in webhook secret")
-
-	errMissingPushEventFields = errors.New("missing required fields: ref or repository URL")
+	errMissingPushEventFields  = errors.New("missing required fields: ref or repository URL")
 )
 
 // Handler handles incoming Git webhook requests and triggers on-commit rebuilds for matching ImageBuilds.
