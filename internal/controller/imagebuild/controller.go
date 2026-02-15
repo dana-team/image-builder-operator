@@ -263,8 +263,10 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 
 	policy := &buildv1alpha1.ImageBuildPolicy{}
 	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
-		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing"); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
+		if apierrors.IsNotFound(err) {
+			if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing"); patchErr != nil {
+				logger.Error(patchErr, "failed to patch Ready condition")
+			}
 		}
 		return fmt.Errorf("failed to get ImageBuildPolicy: %w", err)
 	}
