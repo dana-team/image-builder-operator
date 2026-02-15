@@ -180,11 +180,11 @@ func main() {
 
 	if os.Getenv("ENABLE_ONCOMMIT_WEBHOOK") == "true" {
 		hookServer := mgr.GetWebhookServer()
-		hookServer.Register("/webhooks/git", &gitwebhook.Handler{
+		hookServer.Register(gitwebhook.WebhookPath, &gitwebhook.Handler{
 			Client:        mgr.GetClient(),
 			EventRecorder: mgr.GetEventRecorderFor("git-webhook"),
 		})
-		setupLog.Info("git webhook handler registered at /webhooks/git")
+		setupLog.Info("git webhook handler registered", "path", gitwebhook.WebhookPath)
 	} else {
 		setupLog.Info("git webhook handler disabled (set ENABLE_ONCOMMIT_WEBHOOK=true to enable)")
 	}

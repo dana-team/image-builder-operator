@@ -30,7 +30,7 @@ func TestGitHubSuccess(t *testing.T) {
 	mac.Write(body)
 	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
-	req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(github.EventTypeHeader, "push")
 	req.Header.Set(github.SHA256SignatureHeader, sig)

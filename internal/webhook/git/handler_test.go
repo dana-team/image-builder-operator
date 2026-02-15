@@ -23,7 +23,6 @@ var errFake = errors.New("fake error")
 const (
 	refHeadsMain      = "refs/heads/main"
 	revisionMain      = "main"
-	webhookPath       = "/webhooks/git"
 	webhookSecretName = "webhook-secret"
 	webhookSecretKey  = "token"
 )
@@ -34,7 +33,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -47,7 +46,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString("{"))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString("{"))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -61,7 +60,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -79,7 +78,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "wrong")
 		rr := httptest.NewRecorder()
@@ -97,7 +96,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -110,7 +109,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodGet, webhookPath, nil)
+		req := httptest.NewRequest(http.MethodGet, WebhookPath, nil)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -122,7 +121,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://example.com/repo"}}`
-		req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))

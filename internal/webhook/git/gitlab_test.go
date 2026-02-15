@@ -23,7 +23,7 @@ func TestGitLabSuccess(t *testing.T) {
 	h := &Handler{Client: c}
 
 	body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-	req := httptest.NewRequest(http.MethodPost, webhookPath, bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 	req.Header.Set(headerGitlabEvent, "Push Hook")
 	req.Header.Set(headerGitlabToken, "token")
 	rr := httptest.NewRecorder()

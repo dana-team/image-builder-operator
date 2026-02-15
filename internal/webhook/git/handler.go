@@ -19,6 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// WebhookPath is the HTTP path the git webhook handler is registered at.
+const WebhookPath = "/webhooks/git"
+
 // Sentinel errors for webhook handling.
 var (
 	errMethodNotAllowed        = errors.New("method not allowed")
