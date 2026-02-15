@@ -294,7 +294,12 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 		return err
 	}
 
-	return r.patchBuildRef(ctx, imageBuild)
+	if err := r.patchBuildRef(ctx, imageBuild); err != nil {
+		logger.Error(err, "failed to patch BuildRef status")
+		return err
+	}
+
+	return nil
 }
 
 // reconcileInitialBuildRun creates a new BuildRun when the spec has changed,
