@@ -481,36 +481,6 @@ func TestReconcile(t *testing.T) {
 	})
 }
 
-func TestReconcilePrerequisites(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("proceeds when prerequisites are satisfied", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		r, _ := newReconciler(t, ib)
-
-		stop, err := r.reconcilePrerequisites(ctx, ib)
-		require.False(t, stop)
-		require.NoError(t, err)
-	})
-
-	t.Run("stops when label sync fails", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-
-		baseReconciler, baseClient := newReconciler(t, ib)
-		r := &Reconciler{
-			Client: &patchErrorClient{
-				Client: baseClient,
-				err:    errFake,
-			},
-			Scheme: baseReconciler.Scheme,
-		}
-
-		stop, err := r.reconcilePrerequisites(ctx, ib)
-		require.True(t, stop)
-		require.Error(t, err)
-	})
-}
-
 func TestReconcileStatus(t *testing.T) {
 	ctx := context.Background()
 

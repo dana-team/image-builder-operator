@@ -176,8 +176,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("failed to get ImageBuild: %w", err)
 	}
 
-	if stop, err := r.reconcilePrerequisites(ctx, imageBuild); stop {
+	if err := r.ensureOnCommitLabel(ctx, imageBuild); err != nil {
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
+	}
+	if err := r.validateWebhookSecret(ctx, imageBuild); err != nil {
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
 	if err := r.ensureBuild(ctx, imageBuild); err != nil {
@@ -217,16 +220,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *Reconciler) reconcilePrerequisites(ctx context.Context, imageBuild *buildv1alpha1.ImageBuild) (bool, error) {
-	if err := r.ensureOnCommitLabel(ctx, imageBuild); err != nil {
-		return true, err
-	}
-	if err := r.validateWebhookSecret(ctx, imageBuild); err != nil {
-		return true, nil
-	}
-	return false, nil
 }
 
 func (r *Reconciler) reconcileStatus(
