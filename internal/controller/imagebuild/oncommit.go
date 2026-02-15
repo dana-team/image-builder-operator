@@ -18,9 +18,9 @@ const (
 	onCommitMinInterval = 30 * time.Second
 )
 
-// reconcileRebuild handles the on-commit rebuild flow: debounce, duplicate
+// reconcileOnCommitBuildRun handles the on-commit rebuild flow: debounce, duplicate
 // commit detection, active-run check, and BuildRun creation.
-func (r *Reconciler) reconcileRebuild(
+func (r *Reconciler) reconcileOnCommitBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *time.Duration, error) {

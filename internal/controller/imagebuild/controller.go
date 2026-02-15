@@ -352,7 +352,7 @@ func (r *Reconciler) reconcileBuildRun(
 ) (*shipwright.BuildRun, *time.Duration, error) {
 	logger := log.FromContext(ctx)
 
-	if buildRun, requeueAfter, err := r.reconcileRebuild(ctx, ib); err != nil {
+	if buildRun, requeueAfter, err := r.reconcileOnCommitBuildRun(ctx, ib); err != nil {
 		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
 			logger.Error(patchErr, "failed to patch Ready condition")
 		}

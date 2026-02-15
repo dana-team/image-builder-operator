@@ -22,7 +22,7 @@ const (
 	differentCommitSHA = "xyz789"
 )
 
-func TestReconcileRebuild(t *testing.T) {
+func TestReconcileOnCommitBuildRun(t *testing.T) {
 	ctx := context.Background()
 	imageBuildName := "ib"
 	imageBuildNamespace := "ns"
@@ -40,7 +40,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -65,7 +65,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, activeBuildRun)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br, "should return the active BuildRun for status mapping")
@@ -86,7 +86,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, c := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.Nil(t, br)
@@ -113,7 +113,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, requeue, "should requeue for debounce")
 		require.Nil(t, br)
@@ -136,7 +136,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, requeue)
 		require.Nil(t, br)
@@ -164,7 +164,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, doneBuildRun)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -191,7 +191,7 @@ func TestReconcileRebuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		r, _ := newReconciler(t, policy, ib, failedBuildRun)
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
@@ -210,7 +210,7 @@ func TestReconcileRebuild(t *testing.T) {
 		r, _ := newReconciler(t, policy, ib)
 		r.Client = &getErrorClient{Client: r.Client, err: errFake}
 
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.Error(t, err)
 		require.Nil(t, requeue)
 		require.Nil(t, br)
@@ -237,7 +237,7 @@ func TestReconcileRebuild(t *testing.T) {
 		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
-		br, requeue, err := r.reconcileRebuild(ctx, ib)
+		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)
 		require.Nil(t, br)
 		require.Nil(t, requeue)
 		require.Error(t, err)
