@@ -393,24 +393,6 @@ func TestIsActiveBuildRun(t *testing.T) {
 	}
 }
 
-func TestClearPendingCommit(t *testing.T) {
-	ctx := context.Background()
-	imageBuildName := "ib"
-	imageBuildNamespace := "ns"
-
-	ib := newImageBuild(imageBuildName, imageBuildNamespace)
-	ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-		Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
-	}
-
-	r, c := newReconciler(t, ib)
-	require.NoError(t, r.clearPendingCommit(ctx, ib))
-
-	latest := &buildv1alpha1.ImageBuild{}
-	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))
-	require.Nil(t, latest.Status.OnCommit.Pending)
-}
-
 func TestEnsureOnCommitLabel(t *testing.T) {
 	ctx := context.Background()
 	imageBuildName := "ib"

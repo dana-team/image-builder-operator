@@ -34,8 +34,10 @@ func (r *Reconciler) reconcileRebuild(
 
 	pendingCommit := ib.Status.OnCommit.Pending.CommitSHA
 	if isDuplicateCommit(ib, pendingCommit) {
-		if err := r.clearPendingCommit(ctx, ib); err != nil {
-			return nil, nil, err
+		orig := ib.DeepCopy()
+		ib.Status.OnCommit.Pending = nil
+		if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
+			return nil, nil, fmt.Errorf("failed to clear pending commit status: %w", err)
 		}
 		return nil, nil, nil
 	}
@@ -105,17 +107,6 @@ func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
 	return ib.Status.OnCommit.LastTriggeredBuildRun.CommitSHA == commitSHA
 }
 
-func (r *Reconciler) clearPendingCommit(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
-	orig := ib.DeepCopy()
-	ib.Status.OnCommit.Pending = nil
-
-	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
-		return fmt.Errorf("failed to clear pending commit status: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Reconciler) activeBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
@@ -176,7 +167,7 @@ func (r *Reconciler) createBuildRun(
 	if err := r.Create(ctx, br); err != nil {
 		return nil, nil, fmt.Errorf("failed to create on-commit BuildRun %q: %w", br.Name, err)
 	}
-	if err := r.markTriggered(ctx, ib, br, counter, commitSHA); err != nil {
+	if err := r.patchOnCommitTriggered(ctx, ib, br, counter, commitSHA); err != nil {
 		return nil, nil, fmt.Errorf("failed to mark triggered for BuildRun %q: %w", br.Name, err)
 	}
 
@@ -191,7 +182,7 @@ func nextTriggerCounter(ib *buildv1alpha1.ImageBuild) int64 {
 	return counter + 1
 }
 
-func (r *Reconciler) markTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {
+func (r *Reconciler) patchOnCommitTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {
 	orig := ib.DeepCopy()
 	ib.Status.OnCommit.TriggerCounter = triggerCounter
 	ib.Status.OnCommit.LastTriggeredBuildRun = &buildv1alpha1.ImageBuildOnCommitLastTriggered{
