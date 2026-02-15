@@ -42,7 +42,7 @@ func (r *Reconciler) reconcileRebuild(
 		return nil, nil, nil
 	}
 
-	activeBuildRun, err := r.activeBuildRun(ctx, ib)
+	activeBuildRun, err := r.getActiveBuildRun(ctx, ib)
 	if err != nil || activeBuildRun != nil {
 		return activeBuildRun, nil, err
 	}
@@ -107,7 +107,7 @@ func isDuplicateCommit(ib *buildv1alpha1.ImageBuild, commitSHA string) bool {
 	return ib.Status.OnCommit.LastTriggeredBuildRun.CommitSHA == commitSHA
 }
 
-func (r *Reconciler) activeBuildRun(
+func (r *Reconciler) getActiveBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
