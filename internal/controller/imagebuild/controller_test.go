@@ -506,7 +506,7 @@ func TestReconcileStatus(t *testing.T) {
 	})
 }
 
-func TestResolveBuildRun(t *testing.T) {
+func TestReconcileBuildRun(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("surfaces unexpected errors without changing status", func(t *testing.T) {
@@ -517,7 +517,7 @@ func TestResolveBuildRun(t *testing.T) {
 		r, c := newReconciler(t, ib)
 		r.Client = &getErrorClient{Client: r.Client, err: errFake}
 
-		br, requeue, err := r.resolveBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileBuildRun(ctx, ib)
 		require.Nil(t, br)
 		require.Nil(t, requeue)
 		require.Error(t, err)
@@ -567,7 +567,7 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 	return latest
 }
 
-func TestEnsureBuildRun(t *testing.T) {
+func TestReconcileInitialBuildRun(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
@@ -584,7 +584,7 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.reconcileInitialBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
@@ -597,7 +597,7 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.reconcileInitialBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, br)
 	})

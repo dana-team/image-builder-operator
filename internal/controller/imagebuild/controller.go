@@ -195,7 +195,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	buildRun, requeueAfter, err := r.resolveBuildRun(ctx, imageBuild)
+	buildRun, requeueAfter, err := r.reconcileBuildRun(ctx, imageBuild)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
 			return ctrl.Result{}, err
@@ -301,9 +301,9 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 	return nil
 }
 
-// reconcileBuildRun creates a new BuildRun when the spec has changed,
+// reconcileInitialBuildRun creates a new BuildRun when the spec has changed,
 // or returns the existing one otherwise.
-func (r *Reconciler) reconcileBuildRun(
+func (r *Reconciler) reconcileInitialBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
@@ -337,10 +337,10 @@ func (r *Reconciler) reconcileBuildRun(
 	return nil, nil
 }
 
-// resolveBuildRun resolves the active or required BuildRun for the given ImageBuild.
+// reconcileBuildRun reconciles the active or required BuildRun for the given ImageBuild.
 // It tries on-commit rebuild first, then falls back to spec-change BuildRun creation.
 // On failure it patches the Ready condition with the appropriate reason.
-func (r *Reconciler) resolveBuildRun(
+func (r *Reconciler) reconcileBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *time.Duration, error) {
@@ -355,7 +355,7 @@ func (r *Reconciler) resolveBuildRun(
 		return buildRun, requeueAfter, nil
 	}
 
-	buildRun, err := r.reconcileBuildRun(ctx, ib)
+	buildRun, err := r.reconcileInitialBuildRun(ctx, ib)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
 			return nil, nil, err

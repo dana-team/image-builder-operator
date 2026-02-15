@@ -87,7 +87,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var authenticatedCount int
 	for _, ib := range matches {
 
-		secret, err := resolveWebhookSecret(ctx, h.Client, &ib)
+		secret, err := getWebhookSecret(ctx, h.Client, &ib)
 		if err != nil {
 			logger.Error(err, "failed to resolve webhook secret", "name", ib.Name, "namespace", ib.Namespace)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -160,7 +160,7 @@ func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.Ima
 	return nil
 }
 
-func resolveWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha1.ImageBuild) ([]byte, error) {
+func getWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha1.ImageBuild) ([]byte, error) {
 	if ib.Spec.OnCommit == nil {
 		return nil, errMissingOnCommit
 	}

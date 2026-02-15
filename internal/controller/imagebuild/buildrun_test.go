@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func TestReconcileBuildRun(t *testing.T) {
+func TestEnsureBuildRun(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("creates BuildRun when it does not exist", func(t *testing.T) {
