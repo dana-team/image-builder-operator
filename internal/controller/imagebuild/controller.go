@@ -191,10 +191,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
-	if err := r.patchBuildRef(ctx, imageBuild); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	buildRun, requeueAfter, err := r.reconcileBuildRun(ctx, imageBuild)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
@@ -298,7 +294,7 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 		return err
 	}
 
-	return nil
+	return r.patchBuildRef(ctx, imageBuild)
 }
 
 // reconcileInitialBuildRun creates a new BuildRun when the spec has changed,

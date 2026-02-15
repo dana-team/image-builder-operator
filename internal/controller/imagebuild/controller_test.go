@@ -408,7 +408,7 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 		})
 
-		t.Run("reports error when status update fails", func(t *testing.T) {
+		t.Run("requeues when status patch fails in build phase", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
@@ -424,8 +424,8 @@ func TestReconcile(t *testing.T) {
 			res, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace},
 			})
-			require.Error(t, err)
-			require.Equal(t, ctrl.Result{}, res)
+			require.NoError(t, err)
+			require.Equal(t, errorRequeueInterval, res.RequeueAfter)
 		})
 
 		t.Run("reports error on unexpected build run lookup failure", func(t *testing.T) {
