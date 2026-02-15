@@ -584,7 +584,7 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.ensureBuildRun(ctx, ib)
+		br, err := r.reconcileBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
@@ -597,7 +597,7 @@ func TestEnsureBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.ensureBuildRun(ctx, ib)
+		br, err := r.reconcileBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, br)
 	})

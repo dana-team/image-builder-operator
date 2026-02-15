@@ -25,7 +25,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, c := newReconciler(t, ib)
 
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, br)
 
@@ -49,10 +49,10 @@ func TestReconcileBuildRun(t *testing.T) {
 		require.NoError(t, controllerutil.SetControllerReference(ib, existingBuildRun, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, existingBuildRun)
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Equal(t, existingBuildRun.Name, br.Name)
-		require.Equal(t, existingBuildRun.UID, br.UID, "expected reconcileBuildRun to return the existing BuildRun object")
+		require.Equal(t, existingBuildRun.UID, br.UID, "expected ensureBuildRun to return the existing BuildRun object")
 	})
 
 	t.Run("fails when BuildRun owned by another ImageBuild", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.Nil(t, br)
 		require.Error(t, err)
 
@@ -82,7 +82,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		r.Client = &getErrorClient{Client: r.Client, err: errFake}
 
-		br, err := r.reconcileBuildRun(ctx, ib)
+		br, err := r.ensureBuildRun(ctx, ib)
 		require.Nil(t, br)
 		require.Error(t, err)
 	})

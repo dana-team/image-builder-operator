@@ -27,7 +27,7 @@ type buildInputs struct {
 	Output    buildv1alpha1.ImageBuildOutput `json:"output"`
 }
 
-func (r *Reconciler) reconcileBuildRun(
+func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
