@@ -177,10 +177,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if stop, err := r.reconcilePrerequisites(ctx, imageBuild); stop {
-		if err != nil {
-			return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
-		}
-		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
 	}
 
 	if err := r.ensureBuild(ctx, imageBuild); err != nil {
