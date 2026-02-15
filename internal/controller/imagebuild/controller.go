@@ -180,7 +180,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
 	}
 	if err := r.validateWebhookSecret(ctx, imageBuild); err != nil {
-		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
+		if errors.Is(err, errWebhookSecretMissing) || errors.Is(err, errWebhookSecretInvalidKey) {
+			return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
+		}
+		return ctrl.Result{RequeueAfter: errorRequeueInterval}, err
 	}
 
 	if err := r.reconcileBuild(ctx, imageBuild); err != nil {
