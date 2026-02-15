@@ -47,7 +47,7 @@ func (r *Reconciler) reconcileRebuild(
 		return activeBuildRun, nil, err
 	}
 
-	return r.createBuildRun(ctx, ib, pendingCommit)
+	return r.ensureOnCommitBuildRun(ctx, ib, pendingCommit)
 }
 
 func (r *Reconciler) ensureOnCommitLabel(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
@@ -140,7 +140,7 @@ func isActiveBuildRun(br *shipwright.BuildRun) bool {
 	return status != corev1.ConditionTrue && status != corev1.ConditionFalse
 }
 
-func (r *Reconciler) createBuildRun(
+func (r *Reconciler) ensureOnCommitBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	commitSHA string,
