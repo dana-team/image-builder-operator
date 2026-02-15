@@ -73,7 +73,7 @@ func TestNewBuild(t *testing.T) {
 	})
 }
 
-func TestReconcileBuild(t *testing.T) {
+func TestEnsureBuild(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("creates Build when it does not exist", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestReconcileBuild(t *testing.T) {
 		}
 		r, c := newReconciler(t, ib, strategy)
 
-		err := r.reconcileBuild(ctx, ib, absentStrategy)
+		err := r.ensureBuild(ctx, ib, absentStrategy)
 		require.NoError(t, err)
 
 		build := &shipwright.Build{}
@@ -115,7 +115,7 @@ func TestReconcileBuild(t *testing.T) {
 
 		r, c := newReconciler(t, ib, strategy, existingBuild)
 
-		err := r.reconcileBuild(ctx, ib, absentStrategy)
+		err := r.ensureBuild(ctx, ib, absentStrategy)
 		require.NoError(t, err)
 
 		updated := &shipwright.Build{}
@@ -146,7 +146,7 @@ func TestReconcileBuild(t *testing.T) {
 
 		r, c := newReconciler(t, ib, strategy, existingBuild)
 
-		err := r.reconcileBuild(ctx, ib, absentStrategy)
+		err := r.ensureBuild(ctx, ib, absentStrategy)
 		require.NoError(t, err)
 
 		updated := &shipwright.Build{}
@@ -178,7 +178,7 @@ func TestReconcileBuild(t *testing.T) {
 
 		r, _ := newReconciler(t, ib, strategy, conflictingBuild)
 
-		err := r.reconcileBuild(ctx, ib, absentStrategy)
+		err := r.ensureBuild(ctx, ib, absentStrategy)
 		require.Error(t, err)
 
 		var alreadyOwned *controllerutil.AlreadyOwnedError
@@ -189,7 +189,7 @@ func TestReconcileBuild(t *testing.T) {
 		ib := newImageBuild(testImageBuildName, testNamespace)
 		r, _ := newReconciler(t, ib)
 
-		err := r.reconcileBuild(ctx, ib, "nonexistent-strategy")
+		err := r.ensureBuild(ctx, ib, "nonexistent-strategy")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get ClusterBuildStrategy")
 	})

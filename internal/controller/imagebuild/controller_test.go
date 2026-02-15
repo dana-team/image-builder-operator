@@ -603,7 +603,7 @@ func TestEnsureBuildRun(t *testing.T) {
 	})
 }
 
-func TestEnsureBuild(t *testing.T) {
+func TestReconcileBuild(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("selects present strategy when BuildFile mode is present", func(t *testing.T) {
@@ -616,7 +616,7 @@ func TestEnsureBuild(t *testing.T) {
 		}
 		r, c := newReconciler(t, ib, policy, strategy)
 
-		err := r.ensureBuild(ctx, ib)
+		err := r.reconcileBuild(ctx, ib)
 		require.NoError(t, err)
 
 		build := &shipwright.Build{}
@@ -643,7 +643,7 @@ func TestEnsureBuild(t *testing.T) {
 			Scheme: s,
 		}
 
-		err := r.ensureBuild(ctx, ib)
+		err := r.reconcileBuild(ctx, ib)
 		require.Error(t, err)
 
 		latest := &buildv1alpha1.ImageBuild{}

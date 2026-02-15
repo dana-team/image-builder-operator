@@ -183,7 +183,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: errorRequeueInterval}, nil
 	}
 
-	if err := r.ensureBuild(ctx, imageBuild); err != nil {
+	if err := r.reconcileBuild(ctx, imageBuild); err != nil {
 		var alreadyOwned *controllerutil.AlreadyOwnedError
 		if errors.As(err, &alreadyOwned) {
 			return ctrl.Result{}, nil
@@ -257,9 +257,9 @@ func (r *Reconciler) reconcileStatus(
 	return false, nil
 }
 
-// ensureBuild reconciles the Build for the given ImageBuild
+// reconcileBuild reconciles the Build for the given ImageBuild
 // based on the cluster-wide ImageBuildPolicy.
-func (r *Reconciler) ensureBuild(ctx context.Context, imageBuild *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alpha1.ImageBuild) error {
 	logger := log.FromContext(ctx)
 
 	policy := &buildv1alpha1.ImageBuildPolicy{}
@@ -278,7 +278,7 @@ func (r *Reconciler) ensureBuild(ctx context.Context, imageBuild *buildv1alpha1.
 		selectedStrategyName = present
 	}
 
-	if err := r.reconcileBuild(ctx, imageBuild, selectedStrategyName); err != nil {
+	if err := r.ensureBuild(ctx, imageBuild, selectedStrategyName); err != nil {
 		var (
 			reason       = ReasonBuildReconcileFailed
 			alreadyOwned *controllerutil.AlreadyOwnedError

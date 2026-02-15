@@ -15,8 +15,8 @@ import (
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 )
 
-// reconcileBuild ensures the Shipwright Build exists and matches desired state.
-func (r *Reconciler) reconcileBuild(
+// ensureBuild ensures the Shipwright Build exists and matches desired state.
+func (r *Reconciler) ensureBuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 	selectedStrategyName string,

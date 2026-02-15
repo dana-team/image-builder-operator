@@ -128,7 +128,7 @@ func newClientWithSecretIndexes(t *testing.T, objects ...client.Object) client.C
 }
 
 // buildCreateErrorClient injects errors when creating Build objects,
-// used to exercise the generic error fallthrough in ensureBuild.
+// used to exercise the generic error fallthrough in reconcileBuild.
 type buildCreateErrorClient struct {
 	client.Client
 }
