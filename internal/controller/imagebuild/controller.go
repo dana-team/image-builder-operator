@@ -223,7 +223,7 @@ func (r *Reconciler) reconcilePrerequisites(ctx context.Context, imageBuild *bui
 	if err := r.ensureOnCommitLabel(ctx, imageBuild); err != nil {
 		return true, err
 	}
-	if err := r.ensureWebhookSecret(ctx, imageBuild); err != nil {
+	if err := r.validateWebhookSecret(ctx, imageBuild); err != nil {
 		return true, nil
 	}
 	return false, nil
@@ -381,7 +381,7 @@ func (r *Reconciler) resolveBuildRun(
 	return buildRun, nil, nil
 }
 
-func (r *Reconciler) ensureWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	logger := log.FromContext(ctx)
 
 	if ib.Spec.OnCommit == nil {
