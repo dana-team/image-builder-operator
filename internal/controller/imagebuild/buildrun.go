@@ -133,7 +133,7 @@ func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageB
 		return true
 	}
 
-	if r.needsSecretRetry(ctx, ib) {
+	if r.isSecretRetryNeeded(ctx, ib) {
 		logger.Info("Triggering automatic retry: referenced secret is now available",
 			"ImageBuild", ib.Name,
 			"LastBuildRun", ib.Status.LastBuildRunRef)
@@ -165,9 +165,9 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 	return nil
 }
 
-// needsSecretRetry reports whether the last BuildRun failed due to a missing
+// isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
 // secret that has since become available.
-func (r *Reconciler) needsSecretRetry(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
 	lastBR := &shipwright.BuildRun{}
@@ -241,7 +241,7 @@ func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) s
 	if br.Status.Output != nil && br.Status.Output.Digest != "" {
 		return ib.Spec.Output.Image + "@" + br.Status.Output.Digest
 	}
-	if hasTagOrDigest(ib.Spec.Output.Image) {
+	if isTagOrDigestPresent(ib.Spec.Output.Image) {
 		return ib.Spec.Output.Image
 	}
 	return ""
@@ -278,7 +278,7 @@ func nextBuildRunCounter(ib *buildv1alpha1.ImageBuild) int64 {
 	return counter + 1
 }
 
-func hasTagOrDigest(image string) bool {
+func isTagOrDigestPresent(image string) bool {
 	parsed, err := distref.ParseNormalizedNamed(image)
 	if err != nil {
 		return false
