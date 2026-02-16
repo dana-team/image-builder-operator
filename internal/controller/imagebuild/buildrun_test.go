@@ -253,7 +253,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		r, _ := newReconciler(t, ib)
 
-		require.True(t, r.isNewBuildRequired(ctx, ib))
+		require.True(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("required when previous build spec is not recorded", func(t *testing.T) {
@@ -261,7 +261,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		ib.Status.LastBuildRunRef = testBuildRunName
 		r, _ := newReconciler(t, ib)
 
-		require.True(t, r.isNewBuildRequired(ctx, ib))
+		require.True(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("not required when build inputs are unchanged", func(t *testing.T) {
@@ -271,7 +271,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.False(t, r.isNewBuildRequired(ctx, ib))
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	fieldChangeTests := []struct {
@@ -292,7 +292,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 			require.NoError(t, r.recordBuildSpec(ib))
 			tt.mutate(ib)
 
-			require.True(t, r.isNewBuildRequired(ctx, ib))
+			require.True(t, r.isSpecDrifted(ctx, ib))
 		})
 	}
 
@@ -310,7 +310,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 			},
 		}
 
-		require.False(t, r.isNewBuildRequired(ctx, ib))
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("not required when only rebuild mode changes", func(t *testing.T) {
@@ -322,7 +322,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 
-		require.False(t, r.isNewBuildRequired(ctx, ib))
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
@@ -352,7 +352,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		r, _ := newReconciler(t, ib, failedBR, secret)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.True(t, r.isNewBuildRequired(ctx, ib))
+		require.True(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("does not retry when secret is still missing", func(t *testing.T) {
@@ -375,7 +375,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		r, _ := newReconciler(t, ib, failedBR)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.False(t, r.isNewBuildRequired(ctx, ib))
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("does not retry for non-registration errors", func(t *testing.T) {
@@ -397,7 +397,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 		r, _ := newReconciler(t, ib, failedBR)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.False(t, r.isNewBuildRequired(ctx, ib))
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 }
 

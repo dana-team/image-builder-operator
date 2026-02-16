@@ -313,7 +313,7 @@ func (r *Reconciler) reconcileDefaultBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
-	if r.isNewBuildRequired(ctx, imageBuild) {
+	if r.isSpecDrifted(ctx, imageBuild) {
 		br, err := r.ensureBuildRun(ctx, imageBuild)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)

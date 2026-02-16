@@ -107,9 +107,9 @@ func (r *Reconciler) patchLatestImage(
 	return nil
 }
 
-// isNewBuildRequired reports whether a new BuildRun should be created,
-// based on spec drift, missing prior runs, or a secret-retry condition.
-func (r *Reconciler) isNewBuildRequired(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+// isSpecDrifted reports whether the observed state has drifted from the desired
+// state, indicating a new BuildRun should be created.
+func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
 	if ib.Status.LastBuildRunRef == "" {
