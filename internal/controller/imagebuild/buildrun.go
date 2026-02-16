@@ -27,6 +27,33 @@ type buildInputs struct {
 	Output    buildv1alpha1.ImageBuildOutput `json:"output"`
 }
 
+// getOrCreateBuildRun gets or creates a BuildRun owned by the given ImageBuild.
+func (r *Reconciler) getOrCreateBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+	desired *shipwright.BuildRun,
+) (*shipwright.BuildRun, bool, error) {
+	existing := &shipwright.BuildRun{}
+	key := client.ObjectKeyFromObject(desired)
+	if err := r.Get(ctx, key, existing); err == nil {
+		if !metav1.IsControlledBy(existing, ib) {
+			return nil, false, &controllerutil.AlreadyOwnedError{Object: existing}
+		}
+		return existing, false, nil
+	} else if client.IgnoreNotFound(err) != nil {
+		return nil, false, fmt.Errorf("failed to get BuildRun %q: %w", key.Name, err)
+	}
+
+	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
+		return nil, false, fmt.Errorf("failed to set controller reference on BuildRun %q: %w", desired.Name, err)
+	}
+	if err := r.Create(ctx, desired); err != nil {
+		return nil, false, fmt.Errorf("failed to create BuildRun %q: %w", desired.Name, err)
+	}
+
+	return desired, true, nil
+}
+
 func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
@@ -34,22 +61,12 @@ func (r *Reconciler) ensureBuildRun(
 	counter := nextBuildRunCounter(ib)
 	desired := newBuildRun(ib, counter)
 
-	existing := &shipwright.BuildRun{}
-	key := client.ObjectKeyFromObject(desired)
-	if err := r.Get(ctx, key, existing); err == nil {
-		if !metav1.IsControlledBy(existing, ib) {
-			return nil, &controllerutil.AlreadyOwnedError{Object: existing}
-		}
-		return existing, nil
-	} else if client.IgnoreNotFound(err) != nil {
-		return nil, fmt.Errorf("failed to get BuildRun %q: %w", key.Name, err)
+	br, created, err := r.getOrCreateBuildRun(ctx, ib, desired)
+	if err != nil {
+		return nil, err
 	}
-
-	if err := controllerutil.SetControllerReference(ib, desired, r.Scheme); err != nil {
-		return nil, fmt.Errorf("failed to set controller reference on BuildRun %q: %w", desired.Name, err)
-	}
-	if err := r.Create(ctx, desired); err != nil {
-		return nil, fmt.Errorf("failed to create BuildRun %q: %w", desired.Name, err)
+	if !created {
+		return br, nil
 	}
 
 	orig := ib.DeepCopy()
@@ -58,7 +75,7 @@ func (r *Reconciler) ensureBuildRun(
 		return nil, fmt.Errorf("failed to patch BuildRunCounter status: %w", err)
 	}
 
-	return desired, nil
+	return br, nil
 }
 
 func (r *Reconciler) patchBuildSucceededCondition(

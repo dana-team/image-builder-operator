@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -146,29 +145,20 @@ func (r *Reconciler) ensureOnCommitBuildRun(
 	commitSHA string,
 ) (*shipwright.BuildRun, *time.Duration, error) {
 	counter := nextTriggerCounter(ib)
-	br := newBuildRun(ib, counter)
-	br.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	br.Labels[buildv1alpha1.LabelKeyBuildTrigger] = "oncommit"
+	desired := newBuildRun(ib, counter)
+	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
+	desired.Labels[buildv1alpha1.LabelKeyBuildTrigger] = "oncommit"
 
-	existing := &shipwright.BuildRun{}
-	key := client.ObjectKeyFromObject(br)
-	if err := r.Get(ctx, key, existing); err == nil {
-		if !metav1.IsControlledBy(existing, ib) {
-			return nil, nil, &controllerutil.AlreadyOwnedError{Object: existing}
-		}
-		return existing, nil, nil
-	} else if client.IgnoreNotFound(err) != nil {
-		return nil, nil, fmt.Errorf("failed to get on-commit BuildRun %q: %w", key.Name, err)
+	br, created, err := r.getOrCreateBuildRun(ctx, ib, desired)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !created {
+		return br, nil, nil
 	}
 
-	if err := controllerutil.SetControllerReference(ib, br, r.Scheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to set controller reference on on-commit BuildRun %q: %w", br.Name, err)
-	}
-	if err := r.Create(ctx, br); err != nil {
-		return nil, nil, fmt.Errorf("failed to create on-commit BuildRun %q: %w", br.Name, err)
-	}
-	if err := r.patchOnCommitTriggered(ctx, ib, br, counter, commitSHA); err != nil {
-		return nil, nil, fmt.Errorf("failed to mark triggered for BuildRun %q: %w", br.Name, err)
+	if err := r.patchOnCommitTriggered(ctx, ib, desired, counter, commitSHA); err != nil {
+		return nil, nil, fmt.Errorf("failed to mark triggered for BuildRun %q: %w", desired.Name, err)
 	}
 
 	return br, nil, nil
