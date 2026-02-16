@@ -58,7 +58,7 @@ func (r *Reconciler) ensureBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
-	counter := nextBuildRunCounter(ib)
+	counter := nextCounter(ib.Status.BuildRunCounter)
 	desired := newBuildRun(ib, counter)
 
 	br, created, err := r.getOrCreateBuildRun(ctx, ib, desired)
@@ -287,12 +287,11 @@ func buildRunNameFor(ib *buildv1alpha1.ImageBuild, counter int64) string {
 	return fmt.Sprintf("%s-buildrun-%d", ib.Name, counter)
 }
 
-func nextBuildRunCounter(ib *buildv1alpha1.ImageBuild) int64 {
-	counter := ib.Status.BuildRunCounter
-	if counter < 0 {
-		counter = 0
+func nextCounter(current int64) int64 {
+	if current < 0 {
+		return 1
 	}
-	return counter + 1
+	return current + 1
 }
 
 func isTagOrDigestPresent(image string) bool {

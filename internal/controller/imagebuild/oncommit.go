@@ -144,7 +144,7 @@ func (r *Reconciler) ensureOnCommitBuildRun(
 	ib *buildv1alpha1.ImageBuild,
 	commitSHA string,
 ) (*shipwright.BuildRun, *time.Duration, error) {
-	counter := nextTriggerCounter(ib)
+	counter := nextCounter(ib.Status.OnCommit.TriggerCounter)
 	desired := newBuildRun(ib, counter)
 	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
 	desired.Labels[buildv1alpha1.LabelKeyBuildTrigger] = "oncommit"
@@ -162,14 +162,6 @@ func (r *Reconciler) ensureOnCommitBuildRun(
 	}
 
 	return br, nil, nil
-}
-
-func nextTriggerCounter(ib *buildv1alpha1.ImageBuild) int64 {
-	counter := ib.Status.OnCommit.TriggerCounter
-	if counter < 0 {
-		counter = 0
-	}
-	return counter + 1
 }
 
 func (r *Reconciler) patchOnCommitTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {

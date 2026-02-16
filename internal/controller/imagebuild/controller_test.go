@@ -204,7 +204,7 @@ func TestReconcile(t *testing.T) {
 					UID:       types.UID("other-uid"),
 				},
 			}
-			conflictingBuildRun := newBuildRun(ib, nextBuildRunCounter(ib))
+			conflictingBuildRun := newBuildRun(ib, nextCounter(ib.Status.BuildRunCounter))
 			require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
 
 			r, c := newReconciler(t, ib, policy, strategy, conflictingBuildRun)
