@@ -238,18 +238,17 @@ func deriveBuildSucceededStatus(br *shipwright.BuildRun) (metav1.ConditionStatus
 	case corev1.ConditionTrue:
 		return metav1.ConditionTrue, ReasonBuildRunSucceeded, "BuildRun succeeded"
 	case corev1.ConditionFalse:
-		msg := "BuildRun failed"
-		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
-			msg = fmt.Sprintf("BuildRun failed: %s", buildRunMessage)
-		}
-		return metav1.ConditionFalse, ReasonBuildRunFailed, strings.TrimSpace(msg)
+		return metav1.ConditionFalse, ReasonBuildRunFailed, deriveConditionMessage("BuildRun failed", succeededCondition)
 	default:
-		msg := "BuildRun is running"
-		if buildRunMessage := strings.TrimSpace(succeededCondition.GetMessage()); buildRunMessage != "" {
-			msg = fmt.Sprintf("BuildRun is running: %s", buildRunMessage)
-		}
-		return metav1.ConditionUnknown, ReasonBuildRunRunning, strings.TrimSpace(msg)
+		return metav1.ConditionUnknown, ReasonBuildRunRunning, deriveConditionMessage("BuildRun is running", succeededCondition)
 	}
+}
+
+func deriveConditionMessage(prefix string, cond *shipwright.Condition) string {
+	if msg := strings.TrimSpace(cond.GetMessage()); msg != "" {
+		return prefix + ": " + msg
+	}
+	return prefix
 }
 
 // computeLatestImage returns the image reference for a successful BuildRun,
