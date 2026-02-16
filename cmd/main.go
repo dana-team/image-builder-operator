@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -43,6 +44,8 @@ import (
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
+
+const envEnableOnCommitWebhook = "ENABLE_ONCOMMIT_WEBHOOK"
 
 var (
 	scheme   = runtime.NewScheme()
@@ -178,7 +181,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if os.Getenv("ENABLE_ONCOMMIT_WEBHOOK") == "true" {
+	if os.Getenv(envEnableOnCommitWebhook) == "true" {
 		hookServer := mgr.GetWebhookServer()
 		hookServer.Register(gitwebhook.WebhookPath, &gitwebhook.Handler{
 			Client:        mgr.GetClient(),
@@ -186,7 +189,7 @@ func main() {
 		})
 		setupLog.Info("git webhook handler registered", "path", gitwebhook.WebhookPath)
 	} else {
-		setupLog.Info("git webhook handler disabled (set ENABLE_ONCOMMIT_WEBHOOK=true to enable)")
+		setupLog.Info(fmt.Sprintf("git webhook handler disabled (set %s=true to enable)", envEnableOnCommitWebhook))
 	}
 
 	// +kubebuilder:scaffold:builder
