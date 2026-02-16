@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/google/go-github/v69/github"
 )
@@ -34,14 +33,7 @@ func (p *githubProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 		return nil, fmt.Errorf("%w: %T", errUnexpectedGitHubEvent, webhookEvent)
 	}
 
-	repo := strings.TrimSpace(payload.GetRepo().GetCloneURL())
-	if repo == "" {
-		repo = strings.TrimSpace(payload.GetRepo().GetHTMLURL())
-	}
-	if repo == "" || strings.TrimSpace(payload.GetRef()) == "" {
-		return nil, errMissingPushEventFields
-	}
-	return &pushEvent{RepoURL: repo, Ref: payload.GetRef(), CommitSHA: payload.GetAfter()}, nil
+	return newPushEvent(payload.GetRepo().GetCloneURL(), payload.GetRepo().GetHTMLURL(), payload.GetRef(), payload.GetAfter())
 }
 
 // Authenticate validates the GitHub webhook signature against the shared secret.

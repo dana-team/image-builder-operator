@@ -182,6 +182,18 @@ func getWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha1.Im
 	return val, nil
 }
 
+// newPushEvent constructs a pushEvent with URL fallback and field validation.
+func newPushEvent(primaryURL, fallbackURL, ref, commitSHA string) (*pushEvent, error) {
+	repo := strings.TrimSpace(primaryURL)
+	if repo == "" {
+		repo = strings.TrimSpace(fallbackURL)
+	}
+	if repo == "" || strings.TrimSpace(ref) == "" {
+		return nil, errMissingPushEventFields
+	}
+	return &pushEvent{RepoURL: repo, Ref: ref, CommitSHA: commitSHA}, nil
+}
+
 func normalizeRepoURL(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.TrimSuffix(s, ".git")
