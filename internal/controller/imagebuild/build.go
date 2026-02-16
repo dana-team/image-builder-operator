@@ -111,7 +111,6 @@ func (r *Reconciler) newBuild(
 	return build
 }
 
-// setNotReady patches the Ready condition to False on a best-effort basis.
 func (r *Reconciler) setNotReady(ctx context.Context, ib *buildv1alpha1.ImageBuild, reason, message string) {
 	if err := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, reason, message); err != nil {
 		log.FromContext(ctx).Error(err, "failed to patch Ready condition")
