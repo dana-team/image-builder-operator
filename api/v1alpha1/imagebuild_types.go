@@ -31,8 +31,6 @@ const ImageBuildSourceTypeGit ImageBuildSourceType = "Git"
 type ImageBuildRebuildMode string
 
 const (
-	// ImageBuildRebuildModeInitial rebuilds the image only when the desired spec changes.
-	ImageBuildRebuildModeInitial ImageBuildRebuildMode = "Initial"
 	// ImageBuildRebuildModeOnCommit rebuilds the image when the desired spec changes or when a new commit is pushed.
 	ImageBuildRebuildModeOnCommit ImageBuildRebuildMode = "OnCommit"
 )
@@ -110,7 +108,7 @@ type ImageBuildGitSource struct {
 
 // ImageBuildRebuild configures the rebuild behavior of an ImageBuild.
 type ImageBuildRebuild struct {
-	// +kubebuilder:validation:Enum=Initial;OnCommit
+	// +kubebuilder:validation:Enum=OnCommit
 	// Mode selects the rebuild strategy.
 	Mode ImageBuildRebuildMode `json:"mode"`
 }

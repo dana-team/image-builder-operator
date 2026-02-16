@@ -307,9 +307,9 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 	return nil
 }
 
-// reconcileInitialBuildRun creates a new BuildRun when the spec has changed,
+// reconcileDefaultBuildRun creates a new BuildRun when the spec has changed,
 // or returns the existing one otherwise.
-func (r *Reconciler) reconcileInitialBuildRun(
+func (r *Reconciler) reconcileDefaultBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
@@ -361,7 +361,7 @@ func (r *Reconciler) reconcileBuildRun(
 		return buildRun, requeueAfter, nil
 	}
 
-	buildRun, err := r.reconcileInitialBuildRun(ctx, ib)
+	buildRun, err := r.reconcileDefaultBuildRun(ctx, ib)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
 			return nil, nil, err

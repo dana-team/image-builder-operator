@@ -567,7 +567,7 @@ func requireImageBuild(t *testing.T, ctx context.Context, c client.Client, ib *b
 	return latest
 }
 
-func TestReconcileInitialBuildRun(t *testing.T) {
+func TestReconcileDefaultBuildRun(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
@@ -584,7 +584,7 @@ func TestReconcileInitialBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileInitialBuildRun(ctx, ib)
+		br, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
@@ -597,7 +597,7 @@ func TestReconcileInitialBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileInitialBuildRun(ctx, ib)
+		br, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, br)
 	})
