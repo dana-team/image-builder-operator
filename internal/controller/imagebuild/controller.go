@@ -264,9 +264,7 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 	policy := &buildv1alpha1.ImageBuildPolicy{}
 	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
 		if apierrors.IsNotFound(err) {
-			if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, ReasonMissingPolicy, "ImageBuildPolicy is missing"); patchErr != nil {
-				logger.Error(patchErr, "failed to patch Ready condition")
-			}
+			r.setNotReady(ctx, imageBuild, ReasonMissingPolicy, "ImageBuildPolicy is missing")
 		}
 		return fmt.Errorf("failed to get ImageBuildPolicy: %w", err)
 	}
@@ -292,9 +290,7 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 			reason = ReasonBuildConflict
 		}
 
-		if patchErr := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionFalse, reason, err.Error()); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
-		}
+		r.setNotReady(ctx, imageBuild, reason, err.Error())
 
 		return err
 	}
@@ -350,12 +346,8 @@ func (r *Reconciler) reconcileBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, *time.Duration, error) {
-	logger := log.FromContext(ctx)
-
 	if buildRun, requeueAfter, err := r.reconcileOnCommitBuildRun(ctx, ib); err != nil {
-		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonBuildRunReconcileFailed, err.Error()); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
-		}
+		r.setNotReady(ctx, ib, ReasonBuildRunReconcileFailed, err.Error())
 		return nil, nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
 	} else if requeueAfter != nil || buildRun != nil {
 		return buildRun, requeueAfter, nil
@@ -371,9 +363,7 @@ func (r *Reconciler) reconcileBuildRun(
 		if errors.As(err, &alreadyOwned) {
 			reason = ReasonBuildRunConflict
 		}
-		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, reason, err.Error()); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
-		}
+		r.setNotReady(ctx, ib, reason, err.Error())
 		return nil, nil, err
 	}
 
@@ -381,8 +371,6 @@ func (r *Reconciler) reconcileBuildRun(
 }
 
 func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
-	logger := log.FromContext(ctx)
-
 	if ib.Spec.OnCommit == nil {
 		return nil
 	}
@@ -398,20 +386,14 @@ func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha
 
 	if err := r.Get(ctx, key, secret); err != nil {
 		if apierrors.IsNotFound(err) {
-			if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretMissing,
-				fmt.Sprintf("WebhookSecret %q not found", secretName)); patchErr != nil {
-				logger.Error(patchErr, "failed to patch Ready condition")
-			}
+			r.setNotReady(ctx, ib, ReasonWebhookSecretMissing, fmt.Sprintf("WebhookSecret %q not found", secretName))
 			return fmt.Errorf("%w: %q", errWebhookSecretMissing, secretName)
 		}
 		return fmt.Errorf("failed to get webhook secret %q: %w", secretName, err)
 	}
 
 	if _, ok := secret.Data[secretKey]; !ok {
-		if patchErr := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, ReasonWebhookSecretInvalidKey,
-			fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey)); patchErr != nil {
-			logger.Error(patchErr, "failed to patch Ready condition")
-		}
+		r.setNotReady(ctx, ib, ReasonWebhookSecretInvalidKey, fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey))
 		return fmt.Errorf("%w: key %q in secret %q", errWebhookSecretInvalidKey, secretKey, secretName)
 	}
 
