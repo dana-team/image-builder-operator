@@ -8,3 +8,8 @@ var (
 
 	AnnotationKeyLastBuildSpec = GroupVersion.Group + "/last-build-spec"
 )
+
+// Predefined label values.
+const (
+	LabelValueBuildTriggerOnCommit = "oncommit"
+)
