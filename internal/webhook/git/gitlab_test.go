@@ -2,36 +2,49 @@ package git
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestGitLabSuccess(t *testing.T) {
-	ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git")
-	c := newClient(t,
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: []byte("token")}},
-		ib,
-	)
-	h := &Handler{Client: c}
+func TestGitLabReadPushEvent(t *testing.T) {
+	p := &gitlabProvider{}
 
-	req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://gitlab.example/group/repo.git")))
-	req.Header.Set(headerGitlabEvent, "Push Hook")
-	req.Header.Set(headerGitlabToken, "token")
-	rr := httptest.NewRecorder()
+	t.Run("parses valid push payload", func(t *testing.T) {
+		body := []byte(gitlabPushPayload(gitlabRepoURL))
+		event, err := p.ReadPushEvent(body)
+		require.NoError(t, err)
+		require.Equal(t, gitlabRepoURL, event.RepoURL)
+		require.Equal(t, refHeadsMain, event.Ref)
+		require.Equal(t, "abc", event.CommitSHA)
+	})
 
-	h.ServeHTTP(rr, req.WithContext(context.Background()))
-	require.Equal(t, http.StatusAccepted, rr.Code)
+	t.Run("rejects malformed JSON", func(t *testing.T) {
+		_, err := p.ReadPushEvent([]byte("{"))
+		require.Error(t, err)
+	})
+}
 
-	updated := &buildv1alpha1.ImageBuild{}
-	require.NoError(t, c.Get(context.Background(), client.ObjectKeyFromObject(ib), updated))
-	require.NotNil(t, updated.Status.OnCommit.Pending)
-	require.Equal(t, "abc", updated.Status.OnCommit.Pending.CommitSHA)
+func TestGitLabAuthenticate(t *testing.T) {
+	p := &gitlabProvider{}
+	secret := []byte("correct")
+	body := []byte(gitlabPushPayload(gitlabRepoURL))
+
+	t.Run("succeeds with valid token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
+		req.Header.Set(headerGitlabToken, string(secret))
+
+		require.NoError(t, p.Authenticate(req, body, secret))
+	})
+
+	t.Run("rejects invalid token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
+		req.Header.Set(headerGitlabToken, "wrong")
+
+		require.Error(t, p.Authenticate(req, body, secret))
+	})
 }

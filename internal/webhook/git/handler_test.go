@@ -3,6 +3,9 @@ package git
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +13,7 @@ import (
 	"testing"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
+	"github.com/google/go-github/v69/github"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +30,10 @@ const (
 	revisionMain      = "main"
 	webhookSecretName = "webhook-secret"
 	webhookSecretKey  = "token"
+
+	gitlabRepoURL  = "https://gitlab.example/group/repo.git"
+	githubRepoURL  = "https://github.com/org/repo"
+	gitlabPushHook = "Push Hook"
 )
 
 func TestServeHTTP(t *testing.T) {
@@ -34,7 +42,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/none.git")))
-		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
 
@@ -47,7 +55,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString("{"))
-		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
 
@@ -60,7 +68,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/repo.git")))
-		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
 
@@ -69,15 +77,15 @@ func TestServeHTTP(t *testing.T) {
 	})
 
 	t.Run("rejects unauthenticated webhook", func(t *testing.T) {
-		ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git")
+		ib := newOnCommitImageBuild(gitlabRepoURL)
 		c := newClient(t,
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: []byte("expected")}},
 			ib,
 		)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://gitlab.example/group/repo.git")))
-		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
 		req.Header.Set(headerGitlabToken, "wrong")
 		rr := httptest.NewRecorder()
 
@@ -86,15 +94,15 @@ func TestServeHTTP(t *testing.T) {
 	})
 
 	t.Run("fails when webhook secret key missing", func(t *testing.T) {
-		ib := newOnCommitImageBuild("https://gitlab.example/group/repo.git")
+		ib := newOnCommitImageBuild(gitlabRepoURL)
 		c := newClient(t,
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{}},
 			ib,
 		)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://gitlab.example/group/repo.git")))
-		req.Header.Set(headerGitlabEvent, "Push Hook")
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+		req.Header.Set(headerGitlabEvent, gitlabPushHook)
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
 
@@ -124,6 +132,60 @@ func TestServeHTTP(t *testing.T) {
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
 		require.Equal(t, http.StatusBadRequest, rr.Code)
 	})
+
+	for _, tc := range []struct {
+		name     string
+		repoURL  string
+		secret   []byte
+		buildReq func(secret []byte) *http.Request
+	}{
+		{
+			name:    "accepts valid GitLab push",
+			repoURL: gitlabRepoURL,
+			secret:  []byte("token"),
+			buildReq: func(secret []byte) *http.Request {
+				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+				req.Header.Set(headerGitlabEvent, gitlabPushHook)
+				req.Header.Set(headerGitlabToken, string(secret))
+				return req
+			},
+		},
+		{
+			name:    "accepts valid GitHub push",
+			repoURL: githubRepoURL,
+			secret:  []byte("s3cr3t"),
+			buildReq: func(secret []byte) *http.Request {
+				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"` + githubRepoURL + `"}}`)
+				mac := hmac.New(sha256.New, secret)
+				mac.Write(body)
+				sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set(github.EventTypeHeader, "push")
+				req.Header.Set(github.SHA256SignatureHeader, sig)
+				return req
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ib := newOnCommitImageBuild(tc.repoURL)
+			c := newClient(t,
+				&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: webhookSecretName, Namespace: ib.Namespace}, Data: map[string][]byte{webhookSecretKey: tc.secret}},
+				ib,
+			)
+			h := &Handler{Client: c}
+			rr := httptest.NewRecorder()
+
+			h.ServeHTTP(rr, tc.buildReq(tc.secret).WithContext(context.Background()))
+			require.Equal(t, http.StatusAccepted, rr.Code)
+
+			updated := &buildv1alpha1.ImageBuild{}
+			require.NoError(t, c.Get(context.Background(), client.ObjectKeyFromObject(ib), updated))
+			require.NotNil(t, updated.Status.OnCommit.Pending)
+			require.Equal(t, "abc", updated.Status.OnCommit.Pending.CommitSHA)
+		})
+	}
 }
 
 func newClient(t *testing.T, objs ...client.Object) client.Client {
