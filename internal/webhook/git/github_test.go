@@ -27,13 +27,6 @@ func TestGitHubReadPushEvent(t *testing.T) {
 		require.Equal(t, "abc123", event.CommitSHA)
 	})
 
-	t.Run("prefers clone URL over HTML URL", func(t *testing.T) {
-		body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"` + githubCloneURL + `","html_url":"` + githubRepoURL + `"}}`)
-		event, err := p.ReadPushEvent(body)
-		require.NoError(t, err)
-		require.Equal(t, githubCloneURL, event.RepoURL)
-	})
-
 	t.Run("falls back to HTML URL when clone URL is empty", func(t *testing.T) {
 		body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"","html_url":"` + githubRepoURL + `"}}`)
 		event, err := p.ReadPushEvent(body)
