@@ -232,7 +232,7 @@ func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.
 			Namespace: ib.Namespace,
 			Name:      name,
 		}, secret); err == nil {
-			logger.V(1).Info("Secret is now available, will retry build", "Secret", name)
+			logger.Info("Secret is now available, will retry build", "Secret", name)
 			return true
 		}
 	}
