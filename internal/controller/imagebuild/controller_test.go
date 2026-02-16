@@ -459,14 +459,14 @@ func TestReconcile(t *testing.T) {
 			strategy := &shipwright.ClusterBuildStrategy{
 				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
 			}
-			existingBR := &shipwright.BuildRun{
+			existingBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "existing-br",
 					Namespace: ib.Namespace,
 				},
 			}
 
-			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy, existingBR)
+			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy, existingBuildRun)
 			r := &Reconciler{
 				Client: &statusPatchErrorClient{Client: baseClient, err: errFake},
 				Scheme: baseReconciler.Scheme,

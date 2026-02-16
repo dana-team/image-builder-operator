@@ -110,17 +110,9 @@ func (r *Reconciler) getActiveBuildRun(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
 ) (*shipwright.BuildRun, error) {
-	if ib.Status.LastBuildRunRef == "" {
-		return nil, nil
-	}
-
-	active := &shipwright.BuildRun{}
-	key := client.ObjectKey{Namespace: ib.Namespace, Name: ib.Status.LastBuildRunRef}
-	if err := r.Get(ctx, key, active); err != nil {
-		if notFoundErr := client.IgnoreNotFound(err); notFoundErr != nil {
-			return nil, fmt.Errorf("failed to get active BuildRun %q: %w", key.Name, notFoundErr)
-		}
-		return nil, nil
+	active, err := r.getLastBuildRun(ctx, ib)
+	if err != nil || active == nil {
+		return nil, err
 	}
 
 	if metav1.IsControlledBy(active, ib) && isActiveBuildRun(active) {

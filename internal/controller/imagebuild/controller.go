@@ -325,18 +325,7 @@ func (r *Reconciler) reconcileDefaultBuildRun(
 		return br, nil
 	}
 
-	if imageBuild.Status.LastBuildRunRef != "" {
-		existingBR := &shipwright.BuildRun{}
-		if err := r.Get(ctx, client.ObjectKey{Namespace: imageBuild.Namespace, Name: imageBuild.Status.LastBuildRunRef}, existingBR); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to fetch last BuildRun %q: %w", imageBuild.Status.LastBuildRunRef, err)
-			}
-		} else {
-			return existingBR, nil
-		}
-	}
-
-	return nil, nil
+	return r.getLastBuildRun(ctx, imageBuild)
 }
 
 // reconcileBuildRun reconciles the active or required BuildRun for the given ImageBuild.

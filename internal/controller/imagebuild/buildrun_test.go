@@ -330,13 +330,13 @@ func TestIsNewBuildRequired(t *testing.T) {
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
 		ib.Status.LastBuildRunRef = testBuildRunName
 
-		failedBR := &shipwright.BuildRun{
+		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testBuildRunName,
 				Namespace: ib.Namespace,
 			},
 		}
-		failedBR.Status.SetCondition(&shipwright.Condition{
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
 			Type:   shipwright.Succeeded,
 			Status: corev1.ConditionFalse,
 			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
@@ -349,7 +349,7 @@ func TestIsNewBuildRequired(t *testing.T) {
 			},
 		}
 
-		r, _ := newReconciler(t, ib, failedBR, secret)
+		r, _ := newReconciler(t, ib, failedBuildRun, secret)
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.True(t, r.isSpecDrifted(ctx, ib))
@@ -360,19 +360,19 @@ func TestIsNewBuildRequired(t *testing.T) {
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
 		ib.Status.LastBuildRunRef = testBuildRunName
 
-		failedBR := &shipwright.BuildRun{
+		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testBuildRunName,
 				Namespace: ib.Namespace,
 			},
 		}
-		failedBR.Status.SetCondition(&shipwright.Condition{
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
 			Type:   shipwright.Succeeded,
 			Status: corev1.ConditionFalse,
 			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
 		})
 
-		r, _ := newReconciler(t, ib, failedBR)
+		r, _ := newReconciler(t, ib, failedBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.False(t, r.isSpecDrifted(ctx, ib))
@@ -382,19 +382,19 @@ func TestIsNewBuildRequired(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Status.LastBuildRunRef = testBuildRunName
 
-		failedBR := &shipwright.BuildRun{
+		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testBuildRunName,
 				Namespace: ib.Namespace,
 			},
 		}
-		failedBR.Status.SetCondition(&shipwright.Condition{
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
 			Type:   shipwright.Succeeded,
 			Status: corev1.ConditionFalse,
 			Reason: "BuildRunTimeout",
 		})
 
-		r, _ := newReconciler(t, ib, failedBR)
+		r, _ := newReconciler(t, ib, failedBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.False(t, r.isSpecDrifted(ctx, ib))

@@ -20,6 +20,23 @@ import (
 	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 )
 
+func (r *Reconciler) getLastBuildRun(ctx context.Context, ib *buildv1alpha1.ImageBuild) (*shipwright.BuildRun, error) {
+	if ib.Status.LastBuildRunRef == "" {
+		return nil, nil
+	}
+
+	br := &shipwright.BuildRun{}
+	key := client.ObjectKey{Namespace: ib.Namespace, Name: ib.Status.LastBuildRunRef}
+	if err := r.Get(ctx, key, br); err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get BuildRun %q: %w", key.Name, err)
+	}
+
+	return br, nil
+}
+
 // buildInputs captures fields that trigger a new build when changed.
 type buildInputs struct {
 	Source    buildv1alpha1.ImageBuildSource `json:"source"`
@@ -187,15 +204,12 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
-	lastBR := &shipwright.BuildRun{}
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: ib.Namespace,
-		Name:      ib.Status.LastBuildRunRef,
-	}, lastBR); err != nil {
+	lastBuildRun, err := r.getLastBuildRun(ctx, ib)
+	if err != nil || lastBuildRun == nil {
 		return false
 	}
 
-	succeededCond := lastBR.Status.GetCondition(shipwright.Succeeded)
+	succeededCond := lastBuildRun.Status.GetCondition(shipwright.Succeeded)
 	if succeededCond == nil || succeededCond.GetStatus() != corev1.ConditionFalse {
 		return false
 	}
