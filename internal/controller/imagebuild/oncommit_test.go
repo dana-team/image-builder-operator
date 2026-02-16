@@ -45,7 +45,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		require.Nil(t, requeue)
 		require.NotNil(t, br)
 		require.Equal(t, expectedOnCommitBuildRunName, br.Name)
-		require.Equal(t, buildv1alpha1.LabelValueBuildTriggerOnCommit, br.Labels[buildv1alpha1.LabelKeyBuildTrigger])
+		require.Equal(t, string(buildv1alpha1.ImageBuildRebuildModeOnCommit), br.Labels[buildv1alpha1.LabelKeyRebuildMode])
 	})
 
 	t.Run("returns active BuildRun when present", func(t *testing.T) {

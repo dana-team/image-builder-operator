@@ -147,7 +147,7 @@ func (r *Reconciler) ensureOnCommitBuildRun(
 	counter := nextCounter(ib.Status.OnCommit.TriggerCounter)
 	desired := newBuildRun(ib, counter)
 	desired.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
-	desired.Labels[buildv1alpha1.LabelKeyBuildTrigger] = buildv1alpha1.LabelValueBuildTriggerOnCommit
+	desired.Labels[buildv1alpha1.LabelKeyRebuildMode] = string(buildv1alpha1.ImageBuildRebuildModeOnCommit)
 
 	br, created, err := r.getOrCreateBuildRun(ctx, ib, desired)
 	if err != nil {

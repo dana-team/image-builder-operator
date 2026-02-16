@@ -4,12 +4,7 @@ package v1alpha1
 var (
 	LabelKeyParentImageBuild = GroupVersion.Group + "/parent-imagebuild"
 	LabelKeyOnCommitEnabled  = GroupVersion.Group + "/oncommit-enabled"
-	LabelKeyBuildTrigger     = GroupVersion.Group + "/build-trigger"
+	LabelKeyRebuildMode      = GroupVersion.Group + "/rebuild-mode"
 
 	AnnotationKeyLastBuildSpec = GroupVersion.Group + "/last-build-spec"
-)
-
-// Predefined label values.
-const (
-	LabelValueBuildTriggerOnCommit = "oncommit"
 )
