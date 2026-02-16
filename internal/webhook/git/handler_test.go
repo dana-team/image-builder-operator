@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,8 +33,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/none.git"}}`
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/none.git")))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -59,8 +59,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
-		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://example.com/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/repo.git")))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -77,8 +76,7 @@ func TestServeHTTP(t *testing.T) {
 		)
 		h := &Handler{Client: c}
 
-		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://gitlab.example/group/repo.git")))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "wrong")
 		rr := httptest.NewRecorder()
@@ -95,8 +93,7 @@ func TestServeHTTP(t *testing.T) {
 		)
 		h := &Handler{Client: c}
 
-		body := `{"ref":"` + refHeadsMain + `","after":"abc","project":{"git_http_url":"https://gitlab.example/group/repo.git"}}`
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://gitlab.example/group/repo.git")))
 		req.Header.Set(headerGitlabEvent, "Push Hook")
 		req.Header.Set(headerGitlabToken, "any")
 		rr := httptest.NewRecorder()
@@ -162,6 +159,10 @@ func newOnCommitImageBuild(url string) *buildv1alpha1.ImageBuild {
 			Rebuild:   &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
 		},
 	}
+}
+
+func gitlabPushPayload(repoURL string) string {
+	return fmt.Sprintf(`{"ref":"%s","after":"abc","project":{"git_http_url":"%s"}}`, refHeadsMain, repoURL)
 }
 
 type listErrorClient struct {
