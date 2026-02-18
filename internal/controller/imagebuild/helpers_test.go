@@ -62,6 +62,12 @@ func newImageBuildPolicy() *buildv1alpha1.ImageBuildPolicy {
 	}
 }
 
+func newClusterBuildStrategy(name string) *shipwright.ClusterBuildStrategy {
+	return &shipwright.ClusterBuildStrategy{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+	}
+}
+
 func newImageBuild(name, namespace string) *buildv1alpha1.ImageBuild {
 	return &buildv1alpha1.ImageBuild{
 		ObjectMeta: metav1.ObjectMeta{

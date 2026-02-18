@@ -78,9 +78,7 @@ func TestEnsureBuild(t *testing.T) {
 
 	t.Run("creates Build when it does not exist", func(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-		}
+		strategy := newClusterBuildStrategy(absentStrategyName)
 		r, c := newReconciler(t, ib, strategy)
 
 		err := r.ensureBuild(ctx, ib, absentStrategyName)
@@ -94,9 +92,7 @@ func TestEnsureBuild(t *testing.T) {
 
 	t.Run("updates existing Build when spec drifts", func(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-		}
+		strategy := newClusterBuildStrategy(absentStrategyName)
 
 		kind := shipwright.ClusterBuildStrategyKind
 		existingBuild := &shipwright.Build{
@@ -125,9 +121,7 @@ func TestEnsureBuild(t *testing.T) {
 
 	t.Run("ensures Build has required labels", func(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-		}
+		strategy := newClusterBuildStrategy(absentStrategyName)
 
 		kind := shipwright.ClusterBuildStrategyKind
 		existingBuild := &shipwright.Build{
@@ -157,9 +151,7 @@ func TestEnsureBuild(t *testing.T) {
 
 	t.Run("fails when Build owned by another ImageBuild", func(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-		}
+		strategy := newClusterBuildStrategy(absentStrategyName)
 
 		otherOwner := &buildv1alpha1.ImageBuild{
 			ObjectMeta: metav1.ObjectMeta{

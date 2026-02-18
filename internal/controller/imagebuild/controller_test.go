@@ -101,9 +101,7 @@ func TestReconcile(t *testing.T) {
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Generation = 1
 
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			r, c := newReconciler(t, ib, policy, strategy)
 
@@ -146,9 +144,7 @@ func TestReconcile(t *testing.T) {
 			ib.Status.LastBuildRunRef = deletedBuildRunName
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			r, c := newReconciler(t, ib, policy, strategy)
 
@@ -162,9 +158,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("reports not ready when Build owned by another ImageBuild", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			otherImageBuild := &buildv1alpha1.ImageBuild{
 				ObjectMeta: metav1.ObjectMeta{
@@ -193,9 +187,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("reports not ready when BuildRun owned by another ImageBuild", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			otherImageBuild := &buildv1alpha1.ImageBuild{
 				ObjectMeta: metav1.ObjectMeta{
@@ -218,9 +210,7 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("reports not ready when on-commit rebuild fails", func(t *testing.T) {
 			policy := newImageBuildPolicy()
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
@@ -273,9 +263,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("records built image after successful build", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			successfulBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
@@ -305,9 +293,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("requeues while build is running", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			runningBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
@@ -335,9 +321,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("retries after interval when build run creation fails", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			r, c := newReconciler(t, ib, policy, strategy)
 			r.Client = &getErrorClient{Client: c, err: errFake}
@@ -354,9 +338,7 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("delays rebuild when commit received recently", func(t *testing.T) {
 			policy := newImageBuildPolicy()
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
@@ -411,9 +393,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("requeues when status patch fails in build phase", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy)
 			r := &Reconciler{
@@ -434,9 +414,7 @@ func TestReconcile(t *testing.T) {
 			ib.Status.LastBuildRunRef = "some-br"
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 
 			r, _ := newReconciler(t, ib, policy, strategy)
 			r.Client = &getErrorClient{Client: r.Client, err: errFake}
@@ -456,9 +434,7 @@ func TestReconcile(t *testing.T) {
 			ib.Status.LastBuildRunRef = "existing-br"
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
-			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-			}
+			strategy := newClusterBuildStrategy(absentStrategyName)
 			existingBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "existing-br",
@@ -611,9 +587,7 @@ func TestReconcileBuild(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Spec.BuildFile.Mode = buildv1alpha1.ImageBuildFileModePresent
 
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: policy.Spec.ClusterBuildStrategy.BuildFile.Present},
-		}
+		strategy := newClusterBuildStrategy(policy.Spec.ClusterBuildStrategy.BuildFile.Present)
 		r, c := newReconciler(t, ib, policy, strategy)
 
 		err := r.reconcileBuild(ctx, ib)
@@ -627,9 +601,7 @@ func TestReconcileBuild(t *testing.T) {
 	t.Run("reports not ready on build reconciliation error", func(t *testing.T) {
 		policy := newImageBuildPolicy()
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
-		}
+		strategy := newClusterBuildStrategy(absentStrategyName)
 
 		s := newScheme(t)
 		fc := fake.NewClientBuilder().
