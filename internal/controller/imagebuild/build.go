@@ -13,6 +13,7 @@ import (
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
+	"k8s.io/utils/ptr"
 )
 
 // ensureBuild ensures the Shipwright Build exists and matches desired state.
@@ -64,8 +65,6 @@ func (r *Reconciler) newBuild(
 	ib *buildv1alpha1.ImageBuild,
 	strategyName string,
 ) *shipwright.Build {
-	kind := shipwright.ClusterBuildStrategyKind
-
 	build := &shipwright.Build{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      buildNameFor(ib),
@@ -77,7 +76,7 @@ func (r *Reconciler) newBuild(
 		Spec: shipwright.BuildSpec{
 			Strategy: shipwright.Strategy{
 				Name: strategyName,
-				Kind: &kind,
+				Kind: ptr.To(shipwright.ClusterBuildStrategyKind),
 			},
 			Source: &shipwright.Source{
 				Type: shipwright.GitType,
@@ -92,20 +91,16 @@ func (r *Reconciler) newBuild(
 	}
 
 	if ib.Spec.Source.Git.Revision != "" {
-		rev := ib.Spec.Source.Git.Revision
-		build.Spec.Source.Git.Revision = &rev
+		build.Spec.Source.Git.Revision = ptr.To(ib.Spec.Source.Git.Revision)
 	}
 	if ib.Spec.Source.ContextDir != "" {
-		cd := ib.Spec.Source.ContextDir
-		build.Spec.Source.ContextDir = &cd
+		build.Spec.Source.ContextDir = ptr.To(ib.Spec.Source.ContextDir)
 	}
 	if ib.Spec.Source.Git.CloneSecret != nil && ib.Spec.Source.Git.CloneSecret.Name != "" {
-		sec := ib.Spec.Source.Git.CloneSecret.Name
-		build.Spec.Source.Git.CloneSecret = &sec
+		build.Spec.Source.Git.CloneSecret = ptr.To(ib.Spec.Source.Git.CloneSecret.Name)
 	}
 	if ib.Spec.Output.PushSecret != nil && ib.Spec.Output.PushSecret.Name != "" {
-		ps := ib.Spec.Output.PushSecret.Name
-		build.Spec.Output.PushSecret = &ps
+		build.Spec.Output.PushSecret = ptr.To(ib.Spec.Output.PushSecret.Name)
 	}
 
 	return build

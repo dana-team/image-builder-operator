@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -94,7 +95,6 @@ func TestEnsureBuild(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
 		strategy := newClusterBuildStrategy(absentStrategyName)
 
-		kind := shipwright.ClusterBuildStrategyKind
 		existingBuild := &shipwright.Build{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      buildNameFor(ib),
@@ -102,7 +102,7 @@ func TestEnsureBuild(t *testing.T) {
 				Labels:    map[string]string{buildv1alpha1.LabelKeyParentImageBuild: ib.Name},
 			},
 			Spec: shipwright.BuildSpec{
-				Strategy: shipwright.Strategy{Name: absentStrategyName, Kind: &kind},
+				Strategy: shipwright.Strategy{Name: absentStrategyName, Kind: ptr.To(shipwright.ClusterBuildStrategyKind)},
 				Source:   &shipwright.Source{Type: shipwright.GitType, Git: &shipwright.Git{URL: "https://old-url.com"}},
 				Output:   shipwright.Image{Image: ib.Spec.Output.Image},
 			},
@@ -123,7 +123,6 @@ func TestEnsureBuild(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
 		strategy := newClusterBuildStrategy(absentStrategyName)
 
-		kind := shipwright.ClusterBuildStrategyKind
 		existingBuild := &shipwright.Build{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      buildNameFor(ib),
@@ -131,7 +130,7 @@ func TestEnsureBuild(t *testing.T) {
 				Labels:    nil,
 			},
 			Spec: shipwright.BuildSpec{
-				Strategy: shipwright.Strategy{Name: absentStrategyName, Kind: &kind},
+				Strategy: shipwright.Strategy{Name: absentStrategyName, Kind: ptr.To(shipwright.ClusterBuildStrategyKind)},
 				Source:   &shipwright.Source{Type: shipwright.GitType, Git: &shipwright.Git{URL: ib.Spec.Source.Git.URL}},
 				Output:   shipwright.Image{Image: ib.Spec.Output.Image},
 			},

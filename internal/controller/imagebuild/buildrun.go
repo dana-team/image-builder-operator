@@ -18,6 +18,7 @@ import (
 	distref "github.com/distribution/reference"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
 	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
+	"k8s.io/utils/ptr"
 )
 
 func (r *Reconciler) getLastBuildRun(ctx context.Context, ib *buildv1alpha1.ImageBuild) (*shipwright.BuildRun, error) {
@@ -278,8 +279,6 @@ func computeLatestImage(ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun) s
 }
 
 func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildRun {
-	buildName := buildNameFor(ib)
-
 	return &shipwright.BuildRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      buildRunNameFor(ib, counter),
@@ -290,7 +289,7 @@ func newBuildRun(ib *buildv1alpha1.ImageBuild, counter int64) *shipwright.BuildR
 		},
 		Spec: shipwright.BuildRunSpec{
 			Build: shipwright.ReferencedBuild{
-				Name: &buildName,
+				Name: ptr.To(buildNameFor(ib)),
 			},
 		},
 	}
