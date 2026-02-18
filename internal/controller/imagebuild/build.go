@@ -19,16 +19,16 @@ import (
 func (r *Reconciler) ensureBuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
-	selectedStrategyName string,
+	strategyName string,
 ) error {
 	logger := log.FromContext(ctx)
 
 	clusterBuildStrategy := &shipwright.ClusterBuildStrategy{}
-	if err := r.Get(ctx, types.NamespacedName{Name: selectedStrategyName}, clusterBuildStrategy); err != nil {
-		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", selectedStrategyName, err)
+	if err := r.Get(ctx, types.NamespacedName{Name: strategyName}, clusterBuildStrategy); err != nil {
+		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", strategyName, err)
 	}
 
-	desired := r.newBuild(ib, selectedStrategyName)
+	desired := r.newBuild(ib, strategyName)
 
 	actual := &shipwright.Build{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +62,7 @@ func (r *Reconciler) ensureBuild(
 
 func (r *Reconciler) newBuild(
 	ib *buildv1alpha1.ImageBuild,
-	selectedStrategyName string,
+	strategyName string,
 ) *shipwright.Build {
 	kind := shipwright.ClusterBuildStrategyKind
 
@@ -76,7 +76,7 @@ func (r *Reconciler) newBuild(
 		},
 		Spec: shipwright.BuildSpec{
 			Strategy: shipwright.Strategy{
-				Name: selectedStrategyName,
+				Name: strategyName,
 				Kind: &kind,
 			},
 			Source: &shipwright.Source{
