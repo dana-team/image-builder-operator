@@ -153,12 +153,7 @@ func TestEnsureBuild(t *testing.T) {
 		ib := newImageBuild(imageBuildName, namespace)
 		strategy := newClusterBuildStrategy(absentStrategyName)
 
-		otherOwner := &buildv1alpha1.ImageBuild{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "someone-else",
-				UID:  types.UID("other-uid"),
-			},
-		}
+		conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
 
 		conflictingBuild := &shipwright.Build{
 			ObjectMeta: metav1.ObjectMeta{
@@ -166,7 +161,7 @@ func TestEnsureBuild(t *testing.T) {
 				Namespace: ib.Namespace,
 			},
 		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflictingBuild, newScheme(t)))
+		require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflictingBuild, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, strategy, conflictingBuild)
 

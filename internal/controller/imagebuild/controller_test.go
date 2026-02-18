@@ -160,20 +160,14 @@ func TestReconcile(t *testing.T) {
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := newClusterBuildStrategy(absentStrategyName)
 
-			otherImageBuild := &buildv1alpha1.ImageBuild{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "other-ib",
-					Namespace: ib.Namespace,
-					UID:       types.UID("other-uid"),
-				},
-			}
+			conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
 			conflictingBuild := &shipwright.Build{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      buildNameFor(ib),
 					Namespace: ib.Namespace,
 				},
 			}
-			require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuild, newScheme(t)))
+			require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflictingBuild, newScheme(t)))
 
 			r, c := newReconciler(t, ib, policy, strategy, conflictingBuild)
 
@@ -189,15 +183,9 @@ func TestReconcile(t *testing.T) {
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := newClusterBuildStrategy(absentStrategyName)
 
-			otherImageBuild := &buildv1alpha1.ImageBuild{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "other-ib",
-					Namespace: ib.Namespace,
-					UID:       types.UID("other-uid"),
-				},
-			}
+			conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
 			conflictingBuildRun := newBuildRun(ib, nextCounter(ib.Status.BuildRunCounter))
-			require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
+			require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflictingBuildRun, newScheme(t)))
 
 			r, c := newReconciler(t, ib, policy, strategy, conflictingBuildRun)
 
@@ -234,20 +222,14 @@ func TestReconcile(t *testing.T) {
 				},
 			}
 
-			otherImageBuild := &buildv1alpha1.ImageBuild{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "other-ib",
-					Namespace: ib.Namespace,
-					UID:       types.UID("other-uid"),
-				},
-			}
+			conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
 			conflictingBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, 1),
 					Namespace: ib.Namespace,
 				},
 			}
-			require.NoError(t, controllerutil.SetControllerReference(otherImageBuild, conflictingBuildRun, newScheme(t)))
+			require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflictingBuildRun, newScheme(t)))
 
 			r, c := newReconciler(t, ib, policy, strategy, webhookSecret, conflictingBuildRun)
 

@@ -60,13 +60,8 @@ func TestEnsureBuildRun(t *testing.T) {
 		ib.Status.BuildRunCounter = 0
 		conflict := newBuildRun(ib, 1)
 
-		otherOwner := &buildv1alpha1.ImageBuild{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "someone-else",
-				UID:  types.UID("other-uid"),
-			},
-		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
+		conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
+		require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
 		br, err := r.ensureBuildRun(ctx, ib)

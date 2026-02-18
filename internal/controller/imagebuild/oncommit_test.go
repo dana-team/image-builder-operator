@@ -12,7 +12,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -227,14 +226,8 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		conflict := newBuildRun(ib, 0)
 		conflict.Name = fmt.Sprintf("%s-buildrun-oncommit-%d", ib.Name, counter)
 
-		otherOwner := &buildv1alpha1.ImageBuild{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "someone-else",
-				Namespace: ib.Namespace,
-				UID:       types.UID("other-uid"),
-			},
-		}
-		require.NoError(t, controllerutil.SetControllerReference(otherOwner, conflict, newScheme(t)))
+		conflictingImageBuild := newConflictingImageBuild(ib.Namespace)
+		require.NoError(t, controllerutil.SetControllerReference(conflictingImageBuild, conflict, newScheme(t)))
 
 		r, _ := newReconciler(t, ib, conflict)
 		br, requeue, err := r.reconcileOnCommitBuildRun(ctx, ib)

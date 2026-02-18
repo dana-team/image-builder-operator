@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -65,6 +66,16 @@ func newImageBuildPolicy() *buildv1alpha1.ImageBuildPolicy {
 func newClusterBuildStrategy(name string) *shipwright.ClusterBuildStrategy {
 	return &shipwright.ClusterBuildStrategy{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
+	}
+}
+
+func newConflictingImageBuild(namespace string) *buildv1alpha1.ImageBuild {
+	return &buildv1alpha1.ImageBuild{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "other-owner",
+			Namespace: namespace,
+			UID:       types.UID("other-uid"),
+		},
 	}
 }
 
