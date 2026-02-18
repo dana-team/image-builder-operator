@@ -198,7 +198,7 @@ func TestComputeLatestImage(t *testing.T) {
 	})
 }
 
-func TestHasTagOrDigest(t *testing.T) {
+func TestIsTagOrDigestPresent(t *testing.T) {
 	digest := sha256.Sum256([]byte("digest"))
 
 	tests := []struct {
@@ -244,7 +244,7 @@ func TestPatchLatestImage(t *testing.T) {
 	})
 }
 
-func TestIsNewBuildRequired(t *testing.T) {
+func TestIsSpecDrifted(t *testing.T) {
 	ctx := context.Background()
 	const testBuildRunName = "some-buildrun"
 	const testSecretName = "push-secret"
