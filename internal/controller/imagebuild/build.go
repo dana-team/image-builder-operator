@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -104,54 +102,6 @@ func (r *Reconciler) newBuild(
 	}
 
 	return build
-}
-
-func (r *Reconciler) setNotReady(ctx context.Context, ib *buildv1alpha1.ImageBuild, reason, message string) {
-	if err := r.patchReadyCondition(ctx, ib, metav1.ConditionFalse, reason, message); err != nil {
-		log.FromContext(ctx).Error(err, "failed to patch Ready condition")
-	}
-}
-
-func (r *Reconciler) patchReadyCondition(
-	ctx context.Context,
-	ib *buildv1alpha1.ImageBuild,
-	status metav1.ConditionStatus,
-	reason, message string,
-) error {
-	orig := ib.DeepCopy()
-
-	ib.Status.ObservedGeneration = ib.Generation
-
-	meta.SetStatusCondition(&ib.Status.Conditions, metav1.Condition{
-		Type:               TypeReady,
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: ib.Generation,
-	})
-
-	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
-		return fmt.Errorf("failed to patch Ready condition status: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Reconciler) patchBuildRef(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
-	buildRef := buildNameFor(ib)
-	if ib.Status.BuildRef == buildRef && ib.Status.ObservedGeneration == ib.Generation {
-		return nil
-	}
-
-	orig := ib.DeepCopy()
-	ib.Status.ObservedGeneration = ib.Generation
-	ib.Status.BuildRef = buildRef
-
-	if err := r.Status().Patch(ctx, ib, client.MergeFrom(orig)); err != nil {
-		return fmt.Errorf("failed to patch ImageBuild status: %w", err)
-	}
-
-	return nil
 }
 
 func buildNameFor(ib *buildv1alpha1.ImageBuild) string {
