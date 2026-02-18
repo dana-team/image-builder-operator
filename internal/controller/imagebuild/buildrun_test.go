@@ -246,8 +246,8 @@ func TestPatchLatestImage(t *testing.T) {
 
 func TestIsSpecDrifted(t *testing.T) {
 	ctx := context.Background()
-	const testBuildRunName = "some-buildrun"
-	const testSecretName = "push-secret"
+	const buildRunName = "some-buildrun"
+	const secretName = "push-secret"
 
 	t.Run("required when no previous build exists", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
@@ -258,7 +258,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("required when previous build spec is not recorded", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Status.LastBuildRunRef = buildRunName
 		r, _ := newReconciler(t, ib)
 
 		require.True(t, r.isSpecDrifted(ctx, ib))
@@ -266,7 +266,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("not required when build inputs are unchanged", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Status.LastBuildRunRef = buildRunName
 		r, _ := newReconciler(t, ib)
 
 		require.NoError(t, r.recordBuildSpec(ib))
@@ -286,7 +286,7 @@ func TestIsSpecDrifted(t *testing.T) {
 	for _, tt := range fieldChangeTests {
 		t.Run(tt.name, func(t *testing.T) {
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			ib.Status.LastBuildRunRef = testBuildRunName
+			ib.Status.LastBuildRunRef = buildRunName
 			r, _ := newReconciler(t, ib)
 
 			require.NoError(t, r.recordBuildSpec(ib))
@@ -298,7 +298,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("not required when only onCommit field is added", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Status.LastBuildRunRef = buildRunName
 		r, _ := newReconciler(t, ib)
 
 		require.NoError(t, r.recordBuildSpec(ib))
@@ -315,7 +315,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("not required when only rebuild mode changes", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Status.LastBuildRunRef = buildRunName
 		r, _ := newReconciler(t, ib)
 
 		require.NoError(t, r.recordBuildSpec(ib))
@@ -327,12 +327,12 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      testBuildRunName,
+				Name:      buildRunName,
 				Namespace: ib.Namespace,
 			},
 		}
@@ -344,7 +344,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      testSecretName,
+				Name:      secretName,
 				Namespace: ib.Namespace,
 			},
 		}
@@ -357,12 +357,12 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("does not retry when secret is still missing", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: testSecretName}
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      testBuildRunName,
+				Name:      buildRunName,
 				Namespace: ib.Namespace,
 			},
 		}
@@ -380,11 +380,11 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("does not retry for non-registration errors", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = testBuildRunName
+		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      testBuildRunName,
+				Name:      buildRunName,
 				Namespace: ib.Namespace,
 			},
 		}

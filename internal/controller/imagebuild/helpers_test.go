@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const absentStrategy = "absent-strategy"
+const absentStrategyName = "absent-strategy"
 
 var errFake = errors.New("fake error")
 
@@ -55,7 +55,7 @@ func newImageBuildPolicy() *buildv1alpha1.ImageBuildPolicy {
 			ClusterBuildStrategy: buildv1alpha1.ImageBuildClusterStrategy{
 				BuildFile: buildv1alpha1.ImageBuildFileStrategy{
 					Present: "present-strategy",
-					Absent:  absentStrategy,
+					Absent:  absentStrategyName,
 				},
 			},
 		},

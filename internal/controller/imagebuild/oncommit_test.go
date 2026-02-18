@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	testCommitSHA      = "abc123"
+	commitSHA          = "abc123"
 	differentCommitSHA = "xyz789"
 )
 
@@ -34,7 +34,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 
 		policy := newImageBuildPolicy()
@@ -54,7 +54,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		activeBuildRunName := "active-br"
 		ib.Status.LastBuildRunRef = activeBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 
 		activeBuildRun := &shipwright.BuildRun{
@@ -76,10 +76,10 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 			LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{
 				Name:      expectedOnCommitBuildRunName,
-				CommitSHA: testCommitSHA,
+				CommitSHA: commitSHA,
 			},
 		}
 
@@ -105,7 +105,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
 			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
 				Ref:        refName,
-				CommitSHA:  testCommitSHA,
+				CommitSHA:  commitSHA,
 				ReceivedAt: metav1.NewTime(now),
 			},
 		}
@@ -125,10 +125,10 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 			LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{
 				Name:        expectedOnCommitBuildRunName,
-				CommitSHA:   testCommitSHA,
+				CommitSHA:   commitSHA,
 				TriggeredAt: metav1.NewTime(now),
 			},
 		}
@@ -149,7 +149,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = doneBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 
 		doneBuildRun := &shipwright.BuildRun{
@@ -176,7 +176,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = failedBuildRunName
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 
 		failedBuildRun := &shipwright.BuildRun{
@@ -203,7 +203,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.LastBuildRunRef = "missing-br"
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 
 		policy := newImageBuildPolicy()
@@ -220,7 +220,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		ib := newImageBuild(imageBuildName, imageBuildNamespace)
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 		ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
-			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: testCommitSHA},
+			Pending: &buildv1alpha1.ImageBuildOnCommitEvent{Ref: refName, CommitSHA: commitSHA},
 		}
 		counter := int64(1)
 
@@ -287,7 +287,7 @@ func TestIsRebuildEnabled(t *testing.T) {
 				},
 				Status: buildv1alpha1.ImageBuildStatus{
 					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
-						Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: testCommitSHA},
+						Pending: &buildv1alpha1.ImageBuildOnCommitEvent{CommitSHA: commitSHA},
 					},
 				},
 			},
@@ -333,7 +333,7 @@ func TestIsDuplicateCommit(t *testing.T) {
 			ib: &buildv1alpha1.ImageBuild{
 				Status: buildv1alpha1.ImageBuildStatus{
 					OnCommit: &buildv1alpha1.ImageBuildOnCommitStatus{
-						LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: testCommitSHA},
+						LastTriggeredBuildRun: &buildv1alpha1.ImageBuildOnCommitLastTriggered{CommitSHA: commitSHA},
 					},
 				},
 			},
@@ -343,7 +343,7 @@ func TestIsDuplicateCommit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, isDuplicateCommit(tt.ib, testCommitSHA))
+			require.Equal(t, tt.expected, isDuplicateCommit(tt.ib, commitSHA))
 		})
 	}
 }

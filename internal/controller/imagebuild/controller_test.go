@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	testWebhookSecretName = "github-webhook-secret"
-	testWebhookSecretKey  = "token"
-	testWrongSecretKey    = "wrong-key"
-	testTokenValue        = "my-token"
-	testRevisionV2        = "v2.0.0"
-	testDeletedBuildRun   = "deleted-br"
+	webhookSecretName   = "github-webhook-secret"
+	webhookSecretKey    = "token"
+	wrongSecretKey      = "wrong-key"
+	tokenValue          = "my-token"
+	revisionV2          = "v2.0.0"
+	deletedBuildRunName = "deleted-br"
 )
 
 func TestReconcile(t *testing.T) {
@@ -77,11 +77,11 @@ func TestReconcile(t *testing.T) {
 
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testWebhookSecretName,
+					Name:      webhookSecretName,
 					Namespace: ib.Namespace,
 				},
 				Data: map[string][]byte{
-					testWrongSecretKey: []byte(testTokenValue),
+					wrongSecretKey: []byte(tokenValue),
 				},
 			}
 
@@ -102,7 +102,7 @@ func TestReconcile(t *testing.T) {
 			ib.Generation = 1
 
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			r, c := newReconciler(t, ib, policy, strategy)
@@ -114,7 +114,7 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, buildNameFor(ib), latest.Status.BuildRef)
 
 			latest.Generation = 2
-			latest.Spec.Source.Git.Revision = testRevisionV2
+			latest.Spec.Source.Git.Revision = revisionV2
 			require.NoError(t, c.Update(ctx, latest))
 
 			requireReconcile(t, ctx, r, latest)
@@ -143,11 +143,11 @@ func TestReconcile(t *testing.T) {
 		t.Run("continues without error when no BuildRun is available", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-			ib.Status.LastBuildRunRef = testDeletedBuildRun
+			ib.Status.LastBuildRunRef = deletedBuildRunName
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			r, c := newReconciler(t, ib, policy, strategy)
@@ -163,7 +163,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			otherImageBuild := &buildv1alpha1.ImageBuild{
@@ -194,7 +194,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			otherImageBuild := &buildv1alpha1.ImageBuild{
@@ -219,15 +219,15 @@ func TestReconcile(t *testing.T) {
 		t.Run("reports not ready when on-commit rebuild fails", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 			ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
 				WebhookSecretRef: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
-					Key:                  testWebhookSecretKey,
+					LocalObjectReference: corev1.LocalObjectReference{Name: webhookSecretName},
+					Key:                  webhookSecretKey,
 				},
 			}
 			ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
@@ -236,11 +236,11 @@ func TestReconcile(t *testing.T) {
 
 			webhookSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testWebhookSecretName,
+					Name:      webhookSecretName,
 					Namespace: ib.Namespace,
 				},
 				Data: map[string][]byte{
-					testWebhookSecretKey: []byte(testTokenValue),
+					webhookSecretKey: []byte(tokenValue),
 				},
 			}
 
@@ -274,7 +274,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			successfulBuildRun := &shipwright.BuildRun{
@@ -306,7 +306,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			runningBuildRun := &shipwright.BuildRun{
@@ -336,7 +336,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			r, c := newReconciler(t, ib, policy, strategy)
@@ -355,31 +355,31 @@ func TestReconcile(t *testing.T) {
 		t.Run("delays rebuild when commit received recently", func(t *testing.T) {
 			policy := newImageBuildPolicy()
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
 			ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
 				WebhookSecretRef: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
-					Key:                  testWebhookSecretKey,
+					LocalObjectReference: corev1.LocalObjectReference{Name: webhookSecretName},
+					Key:                  webhookSecretKey,
 				},
 			}
 			ib.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{
 				Pending: &buildv1alpha1.ImageBuildOnCommitEvent{
-					CommitSHA:  testCommitSHA,
+					CommitSHA:  commitSHA,
 					ReceivedAt: metav1.NewTime(time.Now()),
 				},
 			}
 
 			webhookSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testWebhookSecretName,
+					Name:      webhookSecretName,
 					Namespace: ib.Namespace,
 				},
 				Data: map[string][]byte{
-					testWebhookSecretKey: []byte(testTokenValue),
+					webhookSecretKey: []byte(tokenValue),
 				},
 			}
 
@@ -412,7 +412,7 @@ func TestReconcile(t *testing.T) {
 			policy := newImageBuildPolicy()
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			baseReconciler, baseClient := newReconciler(t, ib, policy, strategy)
@@ -435,7 +435,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 
 			r, _ := newReconciler(t, ib, policy, strategy)
@@ -457,7 +457,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
 			strategy := &shipwright.ClusterBuildStrategy{
-				ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+				ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 			}
 			existingBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
@@ -539,8 +539,8 @@ func newWebhookImageBuild(t *testing.T) *buildv1alpha1.ImageBuild {
 	}
 	ib.Spec.OnCommit = &buildv1alpha1.ImageBuildOnCommit{
 		WebhookSecretRef: corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: testWebhookSecretName},
-			Key:                  testWebhookSecretKey,
+			LocalObjectReference: corev1.LocalObjectReference{Name: webhookSecretName},
+			Key:                  webhookSecretKey,
 		},
 	}
 	return ib
@@ -628,7 +628,7 @@ func TestReconcileBuild(t *testing.T) {
 		policy := newImageBuildPolicy()
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		strategy := &shipwright.ClusterBuildStrategy{
-			ObjectMeta: metav1.ObjectMeta{Name: absentStrategy},
+			ObjectMeta: metav1.ObjectMeta{Name: absentStrategyName},
 		}
 
 		s := newScheme(t)
