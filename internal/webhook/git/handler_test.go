@@ -32,7 +32,7 @@ const (
 	webhookSecretKey  = "token"
 
 	gitlabRepoURL  = "https://gitlab.example/group/repo.git"
-	githubRepoURL  = "https://github.com/org/repo"
+	githubRepoURL  = "https://github.com/Org/Repo"
 	gitlabPushHook = "Push Hook"
 	fakeToken      = "fake-token"
 )
@@ -156,7 +156,7 @@ func TestServeHTTP(t *testing.T) {
 			repoURL: githubRepoURL,
 			secret:  []byte("s3cr3t"),
 			buildReq: func(secret []byte) *http.Request {
-				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"` + githubRepoURL + `"}}`)
+				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://github.com/org/repo"}}`)
 				mac := hmac.New(sha256.New, secret)
 				mac.Write(body)
 				sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
@@ -183,7 +183,8 @@ func TestServeHTTP(t *testing.T) {
 
 			updated := &buildv1alpha1.ImageBuild{}
 			require.NoError(t, c.Get(context.Background(), client.ObjectKeyFromObject(ib), updated))
-			require.NotNil(t, updated.Status.OnCommit.Pending)
+			require.NotNil(t, updated.Status.OnCommit, "OnCommit status should be set")
+			require.NotNil(t, updated.Status.OnCommit.Pending, "Pending commit should be set")
 			require.Equal(t, "abc", updated.Status.OnCommit.Pending.CommitSHA)
 		})
 	}

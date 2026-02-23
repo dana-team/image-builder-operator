@@ -196,6 +196,7 @@ func newPushEvent(primaryURL, fallbackURL, ref, commitSHA string) (*pushEvent, e
 
 func normalizeRepoURL(s string) string {
 	s = strings.TrimSpace(s)
+	s = strings.ToLower(s)
 	s = strings.TrimSuffix(s, ".git")
 	s = strings.TrimRight(s, "/")
 	return s
