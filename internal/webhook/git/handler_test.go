@@ -32,7 +32,7 @@ const (
 	webhookSecretKey  = "token"
 
 	gitlabRepoURL  = "https://gitlab.example/group/repo.git"
-	githubRepoURL  = "https://github.com/Org/Repo"
+	githubRepoURL  = "https://github.com/Org/Repo.git/"
 	gitlabPushHook = "Push Hook"
 	fakeToken      = "fake-token"
 )
