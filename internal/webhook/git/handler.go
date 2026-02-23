@@ -148,6 +148,7 @@ func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.Ima
 		if err := h.Client.Get(ctx, types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace}, latest); err != nil {
 			return fmt.Errorf("failed to get ImageBuild %s/%s: %w", ib.Namespace, ib.Name, err)
 		}
+		orig := latest.DeepCopy()
 		if latest.Status.OnCommit == nil {
 			latest.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{}
 		}
@@ -158,7 +159,7 @@ func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.Ima
 		}
 		latest.Status.OnCommit.LastReceived = onCommitEvent
 		latest.Status.OnCommit.Pending = onCommitEvent
-		return h.Client.Status().Update(ctx, latest)
+		return h.Client.Status().Patch(ctx, latest, client.MergeFrom(orig))
 	}); err != nil {
 		return fmt.Errorf("failed to patch on-commit status for %s/%s: %w", ib.Namespace, ib.Name, err)
 	}
