@@ -111,7 +111,7 @@ func TestServeHTTP(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 
-	t.Run("rejects non-POST", func(t *testing.T) {
+	t.Run("method not allowed for non-POST requests", func(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
@@ -119,7 +119,7 @@ func TestServeHTTP(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
-		require.Equal(t, http.StatusBadRequest, rr.Code)
+		require.Equal(t, http.StatusMethodNotAllowed, rr.Code)
 	})
 
 	t.Run("rejects unsupported provider", func(t *testing.T) {

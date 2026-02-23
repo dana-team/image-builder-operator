@@ -43,7 +43,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body, provider, err := h.detectProvider(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		if errors.Is(err, errMethodNotAllowed) {
+			http.Error(w, err.Error(), http.StatusMethodNotAllowed)
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 
