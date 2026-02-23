@@ -122,7 +122,8 @@ func deriveBuildSucceededStatus(br *shipwright.BuildRun) (metav1.ConditionStatus
 	case corev1.ConditionFalse:
 		return metav1.ConditionFalse, ReasonBuildRunFailed, deriveConditionMessage("BuildRun failed", succeededCondition)
 	default:
-		return metav1.ConditionUnknown, ReasonBuildRunRunning, deriveConditionMessage("BuildRun is running", succeededCondition)
+		return metav1.ConditionUnknown, ReasonBuildRunRunning,
+			deriveConditionMessage("BuildRun is running", succeededCondition)
 	}
 }
 

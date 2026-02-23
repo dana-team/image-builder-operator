@@ -2,7 +2,6 @@ package imagebuild
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -24,7 +23,7 @@ import (
 )
 
 const (
-	webhookSecretName   = "github-webhook-secret"
+	webhookSecretName   = "github-webhook-secret" //nolint:gosec // G101: variable name contains "secret"; value is a fixture name.
 	webhookSecretKey    = "token"
 	wrongSecretKey      = "wrong-key"
 	tokenValue          = "my-token"
@@ -351,7 +350,7 @@ func TestReconcile(t *testing.T) {
 
 			res := requireReconcile(t, ctx, r, ib)
 			require.NotZero(t, res.RequeueAfter)
-			require.True(t, res.RequeueAfter <= onCommitDebounce)
+			require.LessOrEqual(t, res.RequeueAfter, onCommitDebounce)
 		})
 	})
 
@@ -479,7 +478,7 @@ func TestReconcileBuildRun(t *testing.T) {
 		require.Nil(t, br)
 		require.Nil(t, requeue)
 		require.Error(t, err)
-		require.False(t, errors.Is(err, errBuildRunFailed))
+		require.NotErrorIs(t, err, errBuildRunFailed)
 
 		latest := &buildv1alpha1.ImageBuild{}
 		require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(ib), latest))

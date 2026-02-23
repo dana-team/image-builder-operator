@@ -156,7 +156,10 @@ func (r *Reconciler) ensureOnCommitBuildRun(
 	return br, nil, nil
 }
 
-func (r *Reconciler) patchOnCommitTriggered(ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun, triggerCounter int64, commitSHA string) error {
+func (r *Reconciler) patchOnCommitTriggered(
+	ctx context.Context, ib *buildv1alpha1.ImageBuild, br *shipwright.BuildRun,
+	triggerCounter int64, commitSHA string,
+) error {
 	orig := ib.DeepCopy()
 	ib.Status.OnCommit.TriggerCounter = triggerCounter
 	ib.Status.OnCommit.LastTriggeredBuildRun = &buildv1alpha1.ImageBuildOnCommitLastTriggered{

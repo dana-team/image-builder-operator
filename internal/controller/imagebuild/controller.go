@@ -68,33 +68,39 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctx := context.Background()
 
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexPushSecret, func(obj client.Object) []string {
-		ib := obj.(*buildv1alpha1.ImageBuild)
-		if ib.Spec.Output.PushSecret != nil {
-			return []string{ib.Spec.Output.PushSecret.Name}
-		}
-		return nil
-	}); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx, &buildv1alpha1.ImageBuild{}, indexPushSecret,
+		func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.Output.PushSecret != nil {
+				return []string{ib.Spec.Output.PushSecret.Name}
+			}
+			return nil
+		}); err != nil {
 		return fmt.Errorf("failed to index field %q: %w", indexPushSecret, err)
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexCloneSecret, func(obj client.Object) []string {
-		ib := obj.(*buildv1alpha1.ImageBuild)
-		if ib.Spec.Source.Git.CloneSecret != nil {
-			return []string{ib.Spec.Source.Git.CloneSecret.Name}
-		}
-		return nil
-	}); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx, &buildv1alpha1.ImageBuild{}, indexCloneSecret,
+		func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.Source.Git.CloneSecret != nil {
+				return []string{ib.Spec.Source.Git.CloneSecret.Name}
+			}
+			return nil
+		}); err != nil {
 		return fmt.Errorf("failed to index field %q: %w", indexCloneSecret, err)
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &buildv1alpha1.ImageBuild{}, indexWebhookSecret, func(obj client.Object) []string {
-		ib := obj.(*buildv1alpha1.ImageBuild)
-		if ib.Spec.OnCommit != nil {
-			return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
-		}
-		return nil
-	}); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx, &buildv1alpha1.ImageBuild{}, indexWebhookSecret,
+		func(obj client.Object) []string {
+			ib := obj.(*buildv1alpha1.ImageBuild)
+			if ib.Spec.OnCommit != nil {
+				return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
+			}
+			return nil
+		}); err != nil {
 		return fmt.Errorf("failed to index field %q: %w", indexWebhookSecret, err)
 	}
 
@@ -237,7 +243,10 @@ func (r *Reconciler) reconcileStatus(
 		ready.Status != metav1.ConditionTrue ||
 		ready.ObservedGeneration != imageBuild.Generation ||
 		ready.Reason != ReasonReconciled {
-		if err := r.patchReadyCondition(ctx, imageBuild, metav1.ConditionTrue, ReasonReconciled, "ImageBuild is reconciled"); err != nil {
+		if err := r.patchReadyCondition(
+			ctx, imageBuild, metav1.ConditionTrue,
+			ReasonReconciled, "ImageBuild is reconciled",
+		); err != nil {
 			return false, err
 		}
 	}
@@ -382,7 +391,8 @@ func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha
 	}
 
 	if _, ok := secret.Data[secretKey]; !ok {
-		r.setNotReady(ctx, ib, ReasonWebhookSecretInvalidKey, fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey))
+		r.setNotReady(ctx, ib, ReasonWebhookSecretInvalidKey,
+			fmt.Sprintf("WebhookSecret %q missing key %q", secretName, secretKey))
 		return fmt.Errorf("%w: key %q in secret %q", errWebhookSecretInvalidKey, secretKey, secretName)
 	}
 

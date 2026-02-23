@@ -13,7 +13,7 @@ import (
 
 const (
 	headerGitlabEvent = "X-Gitlab-Event"
-	headerGitlabToken = "X-Gitlab-Token"
+	headerGitlabToken = "X-Gitlab-Token" //nolint:gosec // G101 false positive: HTTP header name, not a credential.
 )
 
 type gitlabProvider struct{}

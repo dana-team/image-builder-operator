@@ -116,7 +116,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, requeue, "should requeue for debounce")
 		require.Nil(t, br)
-		require.True(t, *requeue > 0)
+		require.Positive(t, *requeue)
 	})
 
 	t.Run("requeues for on-commit min interval", func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestReconcileOnCommitBuildRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, requeue)
 		require.Nil(t, br)
-		require.True(t, *requeue > 0)
+		require.Positive(t, *requeue)
 	})
 
 	t.Run("creates new BuildRun when last BuildRun succeeded", func(t *testing.T) {

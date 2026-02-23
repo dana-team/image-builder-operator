@@ -33,7 +33,10 @@ func (p *githubProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 		return nil, fmt.Errorf("%w: %T", errUnexpectedGitHubEvent, webhookEvent)
 	}
 
-	return newPushEvent(payload.GetRepo().GetCloneURL(), payload.GetRepo().GetHTMLURL(), payload.GetRef(), payload.GetAfter())
+	return newPushEvent(
+		payload.GetRepo().GetCloneURL(), payload.GetRepo().GetHTMLURL(),
+		payload.GetRef(), payload.GetAfter(),
+	)
 }
 
 // Authenticate validates the GitHub webhook signature against the shared secret.

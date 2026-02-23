@@ -101,7 +101,7 @@ func TestComputeLatestImage(t *testing.T) {
 		ibCopy := ib.DeepCopy()
 		ibCopy.Spec.Output.Image = "registry.example.com/team/app"
 		br := &shipwright.BuildRun{}
-		require.Equal(t, "", computeLatestImage(ibCopy, br))
+		require.Empty(t, computeLatestImage(ibCopy, br))
 	})
 }
 

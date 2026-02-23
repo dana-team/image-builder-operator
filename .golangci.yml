@@ -29,6 +29,14 @@ linters:
     - predeclared
     - wrapcheck
     - godot
+    - nilerr
+    - gosec
+    - noctx
+    - testifylint
+    - nolintlint
+    - gocritic
+    - usestdlibvars
+    - thelper
   settings:
     errcheck:
       check-blank: true
@@ -53,8 +61,6 @@ linters:
       - linters:
           - dupl
           - lll
-        path: internal/*
-      - linters:
           - wrapcheck
           - err113
         path: _test\.go$

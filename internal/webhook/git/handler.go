@@ -112,7 +112,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if h.EventRecorder != nil {
-			h.EventRecorder.Eventf(&ib, corev1.EventTypeNormal, "WebhookAccepted", "git webhook accepted for %s/%s", ib.Namespace, ib.Name)
+			h.EventRecorder.Eventf(&ib, corev1.EventTypeNormal, "WebhookAccepted",
+				"git webhook accepted for %s/%s", ib.Namespace, ib.Name)
 		}
 	}
 
@@ -142,7 +143,10 @@ func (h *Handler) detectProvider(r *http.Request) ([]byte, webhookProvider, erro
 	return nil, nil, errUnsupportedWebhook
 }
 
-func (h *Handler) patchOnCommitStatus(ctx context.Context, ib *buildv1alpha1.ImageBuild, event *pushEvent, now metav1.Time) error {
+func (h *Handler) patchOnCommitStatus(
+	ctx context.Context, ib *buildv1alpha1.ImageBuild,
+	event *pushEvent, now metav1.Time,
+) error {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &buildv1alpha1.ImageBuild{}
 		if err := h.Client.Get(ctx, types.NamespacedName{Name: ib.Name, Namespace: ib.Namespace}, latest); err != nil {
