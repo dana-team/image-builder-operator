@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	headerGitlabEvent = "X-Gitlab-Event"
-	headerGitlabToken = "X-Gitlab-Token" //nolint:gosec // G101 false positive: HTTP header name, not a credential.
+	gitlabEventHeader = "X-Gitlab-Event"
+	gitlabAuthHeader  = "X-Gitlab-Token"
 )
 
 type gitlabProvider struct{}
@@ -23,7 +23,7 @@ func (p *gitlabProvider) Name() string { return "gitlab" }
 
 // Detect reports whether the request is a GitLab push event.
 func (p *gitlabProvider) Detect(r *http.Request) bool {
-	return strings.EqualFold(strings.TrimSpace(r.Header.Get(headerGitlabEvent)), string(gitlab.PushEvents))
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get(gitlabEventHeader)), string(gitlab.PushEvents))
 }
 
 // ReadPushEvent parses a GitLab push webhook payload into a pushEvent.

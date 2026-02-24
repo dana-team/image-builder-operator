@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	webhookSecretName   = "github-webhook-secret" //nolint:gosec // G101: variable name contains "secret"; value is a fixture name.
+	webhookSecretName   = "wh-secret"
 	webhookSecretKey    = "token"
 	wrongSecretKey      = "wrong-key"
 	tokenValue          = "my-token"

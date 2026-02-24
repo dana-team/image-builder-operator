@@ -34,16 +34,16 @@ func TestGitLabAuthenticate(t *testing.T) {
 
 	t.Run("succeeds with valid token", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, string(secret))
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, string(secret))
 
 		require.NoError(t, p.Authenticate(req, body, secret))
 	})
 
 	t.Run("rejects invalid token", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, "wrong")
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, "wrong")
 
 		require.Error(t, p.Authenticate(req, body, secret))
 	})

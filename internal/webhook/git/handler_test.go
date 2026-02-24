@@ -43,8 +43,8 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/none.git")))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, fakeToken)
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -56,8 +56,8 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString("{"))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, fakeToken)
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -69,8 +69,8 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/repo.git")))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, fakeToken)
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -86,8 +86,8 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, "wrong")
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, "wrong")
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -103,8 +103,8 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
-		req.Header.Set(headerGitlabEvent, gitlabPushHook)
-		req.Header.Set(headerGitlabToken, fakeToken)
+		req.Header.Set(gitlabEventHeader, gitlabPushHook)
+		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -146,8 +146,8 @@ func TestServeHTTP(t *testing.T) {
 			secret:  []byte("token"),
 			buildReq: func(secret []byte) *http.Request {
 				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
-				req.Header.Set(headerGitlabEvent, gitlabPushHook)
-				req.Header.Set(headerGitlabToken, string(secret))
+				req.Header.Set(gitlabEventHeader, gitlabPushHook)
+				req.Header.Set(gitlabAuthHeader, string(secret))
 				return req
 			},
 		},
