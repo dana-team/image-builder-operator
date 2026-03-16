@@ -1,0 +1,53 @@
+name: lint
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - 'OWNERS'
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.1
+
+      - name: Cache Go tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            ./bin
+          key: ${{ runner.os }}-tools-${{ hashFiles('Makefile') }}
+          restore-keys: |
+            ${{ runner.os }}-tools-
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.7.2
+          args: --timeout=2m
+
+      - name: Verify Helm CRDs are in sync
+        run: |
+          make sync-helm-crds
+          if ! git diff --exit-code charts/image-builder-operator/crds/; then
+            echo "ERROR: Helm CRDs are out of sync with generated CRDs."
+            echo "Run 'make sync-helm-crds' and commit the changes."
+            exit 1
+          fi

@@ -1,0 +1,80 @@
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - dupl
+    - errcheck
+    - err113
+    - errname
+    - ginkgolinter
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - contextcheck
+    - errorlint
+    - bodyclose
+    - predeclared
+    - wrapcheck
+    - godot
+    - nilerr
+    - gosec
+    - noctx
+    - testifylint
+    - nolintlint
+    - gocritic
+    - usestdlibvars
+    - thelper
+  settings:
+    errcheck:
+      check-blank: true
+    govet:
+      enable:
+        - shadow
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+        - name: var-naming
+        - name: unexported-return
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - lll
+        path: api/*
+      - linters:
+          - dupl
+          - lll
+          - wrapcheck
+          - err113
+        path: _test\.go$
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

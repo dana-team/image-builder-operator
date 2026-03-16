@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-builder-operator.fullname" . }}-webhook-service
+  labels:
+  {{- include "image-builder-operator.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  selector:
+    control-plane: controller-manager
+  type: ClusterIP
