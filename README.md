@@ -27,9 +27,12 @@ make prereq
 ```bash
 helm install image-builder-operator \
   oci://ghcr.io/dana-team/helm-charts/image-builder-operator \
+  --version <version> \
   --create-namespace \
   --namespace image-builder-operator-system
 ```
+
+> Replace `<version>` with the desired chart version.
 
 **Using kubectl:**
 
