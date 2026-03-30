@@ -627,19 +627,18 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 	})
 
 	t.Run("reconciles ImageBuild when referenced secret appears", func(t *testing.T) {
-		const secretName = "push-secret"
 		const namespace = "ns"
 		const imageBuildName = "ib"
 
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
+				Name:      pushSecretName,
 				Namespace: namespace,
 			},
 		}
 
 		ibPush := newImageBuild(imageBuildName, namespace)
-		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 
 		c := newClientWithSecretIndexes(t, secret, ibPush)
 		r := &Reconciler{Client: c, Scheme: newScheme(t)}

@@ -129,7 +129,6 @@ func TestIsTagOrDigestPresent(t *testing.T) {
 func TestIsSpecDrifted(t *testing.T) {
 	ctx := context.Background()
 	const buildRunName = "some-buildrun"
-	const secretName = "push-secret"
 
 	t.Run("required when no previous build exists", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
@@ -209,7 +208,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
@@ -226,7 +225,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
+				Name:      pushSecretName,
 				Namespace: ib.Namespace,
 			},
 		}
@@ -239,7 +238,7 @@ func TestIsSpecDrifted(t *testing.T) {
 
 	t.Run("does not retry when secret is still missing", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
