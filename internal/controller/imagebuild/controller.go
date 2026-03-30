@@ -108,7 +108,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
-		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.secretWatchPredicate())).
+		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.onCreatePredicate())).
 		Named(controllerName).
 		Complete(r); err != nil {
 		return fmt.Errorf("failed to build controller: %w", err)
@@ -117,22 +117,13 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-// secretWatchPredicate returns a predicate that only accepts Secret create
-// events, so that a newly available secret can trigger a retry for failed builds.
-func (r *Reconciler) secretWatchPredicate() predicate.Predicate {
+// onCreatePredicate returns a predicate that only accepts create events.
+func (r *Reconciler) onCreatePredicate() predicate.Predicate {
 	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return true
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return false
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return false
-		},
+		CreateFunc:  func(e event.CreateEvent) bool { return true },
+		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
 	}
 }
 
