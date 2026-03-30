@@ -17,7 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const absentStrategyName = "absent-strategy"
+const (
+	absentStrategyName = "absent-strategy"
+	pushSecretName     = "push-secret"
+)
 
 var errFake = errors.New("fake error")
 
