@@ -5,5 +5,5 @@ metadata:
 spec:
   clusterBuildStrategy:
     buildFile:
-      present: buildpacks-v3
-      absent: source-to-image
+      present: buildah-strategy-managed-push
+      absent: buildpacks-v3
