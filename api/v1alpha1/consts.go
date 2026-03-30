@@ -6,5 +6,7 @@ var (
 	LabelKeyOnCommitEnabled  = GroupVersion.Group + "/oncommit-enabled"
 	LabelKeyRebuildMode      = GroupVersion.Group + "/rebuild-mode"
 
-	AnnotationKeyLastBuildSpec = GroupVersion.Group + "/last-build-spec"
+	AnnotationKeyLastBuildSpec       = GroupVersion.Group + "/last-build-spec"
+	AnnotationKeyLastRetriedBuildRun = GroupVersion.Group + "/last-retried-buildrun"
+	AnnotationKeyRetryPending        = GroupVersion.Group + "/retry-pending"
 )

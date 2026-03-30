@@ -38,6 +38,7 @@ const (
 
 	buildRunPollInterval = 10 * time.Second
 	errorRequeueInterval = 30 * time.Second
+	retryRequeueInterval = 15 * time.Second
 )
 
 var (
@@ -108,7 +109,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
-		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.secretWatchPredicate())).
+		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.onCreatePredicate())).
 		Named(controllerName).
 		Complete(r); err != nil {
 		return fmt.Errorf("failed to build controller: %w", err)
@@ -117,22 +118,13 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-// secretWatchPredicate returns a predicate that only accepts Secret create
-// events, so that a newly available secret can trigger a retry for failed builds.
-func (r *Reconciler) secretWatchPredicate() predicate.Predicate {
+// onCreatePredicate returns a predicate that only accepts create events.
+func (r *Reconciler) onCreatePredicate() predicate.Predicate {
 	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return true
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return false
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return false
-		},
+		CreateFunc:  func(e event.CreateEvent) bool { return true },
+		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
 	}
 }
 
@@ -267,13 +259,13 @@ func (r *Reconciler) reconcileStatus(
 
 // reconcileBuild reconciles the Build for the given ImageBuild
 // based on the cluster-wide ImageBuildPolicy.
-func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alpha1.ImageBuild) error {
+func (r *Reconciler) reconcileBuild(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
 	logger := log.FromContext(ctx)
 
 	policy := &buildv1alpha1.ImageBuildPolicy{}
 	if err := r.Get(ctx, client.ObjectKey{Name: policyName}, policy); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.setNotReady(ctx, imageBuild, ReasonMissingPolicy, "ImageBuildPolicy is missing")
+			r.setNotReady(ctx, ib, ReasonMissingPolicy, "ImageBuildPolicy is missing")
 		}
 		return fmt.Errorf("failed to get ImageBuildPolicy: %w", err)
 	}
@@ -282,11 +274,11 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 	absent := policy.Spec.ClusterBuildStrategy.BuildFile.Absent
 
 	selectedStrategyName := absent
-	if imageBuild.Spec.BuildFile.Mode == buildv1alpha1.ImageBuildFileModePresent {
+	if ib.Spec.BuildFile.Mode == buildv1alpha1.ImageBuildFileModePresent {
 		selectedStrategyName = present
 	}
 
-	if err := r.ensureBuild(ctx, imageBuild, selectedStrategyName); err != nil {
+	if err := r.ensureBuild(ctx, ib, selectedStrategyName); err != nil {
 		var (
 			reason       = ReasonBuildReconcileFailed
 			alreadyOwned *controllerutil.AlreadyOwnedError
@@ -299,42 +291,17 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 			reason = ReasonBuildConflict
 		}
 
-		r.setNotReady(ctx, imageBuild, reason, err.Error())
+		r.setNotReady(ctx, ib, reason, err.Error())
 
 		return err
 	}
 
-	if err := r.patchBuildRef(ctx, imageBuild); err != nil {
+	if err := r.patchBuildRef(ctx, ib); err != nil {
 		logger.Error(err, "failed to patch BuildRef status")
 		return err
 	}
 
 	return nil
-}
-
-// reconcileDefaultBuildRun creates a new BuildRun when the spec has changed,
-// or returns the existing one otherwise.
-func (r *Reconciler) reconcileDefaultBuildRun(
-	ctx context.Context,
-	imageBuild *buildv1alpha1.ImageBuild,
-) (*shipwright.BuildRun, error) {
-	if r.isSpecDrifted(ctx, imageBuild) {
-		br, err := r.ensureBuildRun(ctx, imageBuild)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
-		}
-
-		if err := r.recordBuildSpec(imageBuild); err != nil {
-			return nil, fmt.Errorf("failed to record build spec: %w", err)
-		}
-		if err := r.Update(ctx, imageBuild); err != nil {
-			return nil, fmt.Errorf("failed to update ImageBuild: %w", err)
-		}
-
-		return br, nil
-	}
-
-	return r.getLastBuildRun(ctx, imageBuild)
 }
 
 // reconcileBuildRun reconciles the active or required BuildRun for the given ImageBuild.
@@ -351,7 +318,7 @@ func (r *Reconciler) reconcileBuildRun(
 		return buildRun, requeueAfter, nil
 	}
 
-	buildRun, err := r.reconcileDefaultBuildRun(ctx, ib)
+	buildRun, requeueAfter, err := r.reconcileDefaultBuildRun(ctx, ib)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
 			return nil, nil, err
@@ -364,8 +331,82 @@ func (r *Reconciler) reconcileBuildRun(
 		r.setNotReady(ctx, ib, reason, err.Error())
 		return nil, nil, err
 	}
+	if requeueAfter != nil {
+		return nil, requeueAfter, nil
+	}
 
 	return buildRun, nil, nil
+}
+
+// reconcileDefaultBuildRun creates a new BuildRun when the spec has changed
+// or a retry is needed, or returns the existing one otherwise.
+func (r *Reconciler) reconcileDefaultBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+) (*shipwright.BuildRun, *time.Duration, error) {
+	if r.isSpecDrifted(ctx, ib) {
+		br, err := r.ensureBuildRunWithSpec(ctx, ib)
+		if err != nil {
+			return nil, nil, err
+		}
+		delete(ib.Annotations, buildv1alpha1.AnnotationKeyLastRetriedBuildRun)
+		if err := r.Update(ctx, ib); err != nil {
+			return nil, nil, fmt.Errorf("failed to update ImageBuild: %w", err)
+		}
+		return br, nil, nil
+	}
+
+	if r.isRetryNeeded(ctx, ib) {
+		if r.isRetryPending(ib) {
+			br, err := r.retryBuildRun(ctx, ib)
+			if err != nil {
+				return nil, nil, err
+			}
+			return br, nil, nil
+		}
+		if err := r.markRetryPending(ctx, ib); err != nil {
+			return nil, nil, err
+		}
+		requeue := retryRequeueInterval
+		return nil, &requeue, nil
+	}
+
+	br, err := r.getLastBuildRun(ctx, ib)
+	return br, nil, err
+}
+
+// retryBuildRun creates a retry BuildRun and marks it so that the same failure
+// is not retried again.
+func (r *Reconciler) retryBuildRun(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+) (*shipwright.BuildRun, error) {
+	br, err := r.ensureBuildRunWithSpec(ctx, ib)
+	if err != nil {
+		return nil, err
+	}
+	ib.Annotations[buildv1alpha1.AnnotationKeyLastRetriedBuildRun] = br.Name
+	delete(ib.Annotations, buildv1alpha1.AnnotationKeyRetryPending)
+	if err := r.Update(ctx, ib); err != nil {
+		return nil, fmt.Errorf("failed to update ImageBuild: %w", err)
+	}
+	return br, nil
+}
+
+func (r *Reconciler) ensureBuildRunWithSpec(
+	ctx context.Context,
+	ib *buildv1alpha1.ImageBuild,
+) (*shipwright.BuildRun, error) {
+	br, err := r.ensureBuildRun(ctx, ib)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
+	}
+
+	if err := r.recordBuildSpec(ib); err != nil {
+		return nil, fmt.Errorf("failed to record build spec: %w", err)
+	}
+
+	return br, nil
 }
 
 func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {

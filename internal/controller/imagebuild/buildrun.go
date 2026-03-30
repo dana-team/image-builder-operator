@@ -94,8 +94,8 @@ func (r *Reconciler) ensureBuildRun(
 	return br, nil
 }
 
-// isSpecDrifted reports whether the observed state has drifted from the desired
-// state, indicating a new BuildRun should be created.
+// isSpecDrifted reports whether the build-relevant spec fields have changed
+// since the last recorded build.
 func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
@@ -114,20 +114,41 @@ func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageB
 		return true
 	}
 
-	if !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
+	return !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
 		!reflect.DeepEqual(ib.Spec.BuildFile, lastInputs.BuildFile) ||
-		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output) {
-		return true
-	}
+		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output)
+}
 
-	if r.isSecretRetryNeeded(ctx, ib) {
-		logger.Info("Triggering automatic retry: referenced secret is now available",
-			"ImageBuild", ib.Name,
-			"LastBuildRun", ib.Status.LastBuildRunRef)
-		return true
+// isRetryNeeded reports whether a previously failed BuildRun should be retried.
+func (r *Reconciler) isRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+	if r.isRetryAttempted(ib) {
+		return false
 	}
+	return r.isSecretRetryNeeded(ctx, ib)
+}
 
-	return false
+// isRetryAttempted reports whether an automatic retry was already attempted
+// for the current failing BuildRun.
+func (r *Reconciler) isRetryAttempted(ib *buildv1alpha1.ImageBuild) bool {
+	return ib.Annotations[buildv1alpha1.AnnotationKeyLastRetriedBuildRun] == ib.Status.LastBuildRunRef
+}
+
+// isRetryPending reports whether a retry was scheduled and is ready to execute.
+func (r *Reconciler) isRetryPending(ib *buildv1alpha1.ImageBuild) bool {
+	return ib.Annotations[buildv1alpha1.AnnotationKeyRetryPending] == ib.Status.LastBuildRunRef
+}
+
+// markRetryPending records that a retry has been scheduled for the current
+// failing BuildRun.
+func (r *Reconciler) markRetryPending(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
+	if ib.Annotations == nil {
+		ib.Annotations = make(map[string]string)
+	}
+	ib.Annotations[buildv1alpha1.AnnotationKeyRetryPending] = ib.Status.LastBuildRunRef
+	if err := r.Update(ctx, ib); err != nil {
+		return fmt.Errorf("failed to mark retry pending: %w", err)
+	}
+	return nil
 }
 
 // recordBuildSpec snapshots the build-relevant spec fields
@@ -152,11 +173,11 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 	return nil
 }
 
-// isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
-// secret that has since become available.
-func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
-	logger := log.FromContext(ctx)
-
+// lastBuildRunFailedWithReason reports whether the last BuildRun for the given
+// ImageBuild has Succeeded=False with the specified reason.
+func (r *Reconciler) lastBuildRunFailedWithReason(
+	ctx context.Context, ib *buildv1alpha1.ImageBuild, reason string,
+) bool {
 	lastBuildRun, err := r.getLastBuildRun(ctx, ib)
 	if err != nil || lastBuildRun == nil {
 		return false
@@ -167,7 +188,15 @@ func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.
 		return false
 	}
 
-	if succeededCond.GetReason() != shipwrightresources.ConditionBuildRegistrationFailed {
+	return succeededCond.GetReason() == reason
+}
+
+// isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
+// secret that has since become available.
+func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+	logger := log.FromContext(ctx)
+
+	if !r.lastBuildRunFailedWithReason(ctx, ib, shipwrightresources.ConditionBuildRegistrationFailed) {
 		return false
 	}
 

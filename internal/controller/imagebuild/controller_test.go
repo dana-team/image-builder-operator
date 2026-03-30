@@ -8,6 +8,7 @@ import (
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
+	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,6 +30,7 @@ const (
 	tokenValue          = "my-token"
 	revisionV2          = "v2.0.0"
 	deletedBuildRunName = "deleted-br"
+	defaultNamespace    = "ns"
 )
 
 func TestReconcile(t *testing.T) {
@@ -541,8 +543,9 @@ func TestReconcileDefaultBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileDefaultBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
+		require.Nil(t, requeue)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
 	})
@@ -554,9 +557,106 @@ func TestReconcileDefaultBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileDefaultBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.Nil(t, br)
+	})
+
+	newRetryReconciler := func(t *testing.T, ib *buildv1alpha1.ImageBuild) (*Reconciler, client.Client) {
+		t.Helper()
+
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
+		ib.Status.LastBuildRunRef = buildRunName
+
+		failedBuildRun := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      buildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
+		})
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pushSecretName,
+				Namespace: ib.Namespace,
+			},
+		}
+
+		r, c := newReconciler(t, ib, failedBuildRun, secret)
+		require.NoError(t, r.recordBuildSpec(ib))
+		return r, c
+	}
+
+	t.Run("defers retry when missing resource appears", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		r, c := newRetryReconciler(t, ib)
+
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
 		require.Nil(t, br)
+		require.NotNil(t, requeue)
+		require.Equal(t, retryRequeueInterval, *requeue)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		require.Equal(t, buildRunName, latest.Annotations[buildv1alpha1.AnnotationKeyRetryPending])
+	})
+
+	t.Run("retries build after deferred wait completes", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Annotations = map[string]string{
+			buildv1alpha1.AnnotationKeyRetryPending: buildRunName,
+		}
+		r, c := newRetryReconciler(t, ib)
+
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.NotNil(t, br)
+		require.NotEqual(t, buildRunName, br.Name)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		require.Equal(t, br.Name, latest.Annotations[buildv1alpha1.AnnotationKeyLastRetriedBuildRun])
+		_, hasPending := latest.Annotations[buildv1alpha1.AnnotationKeyRetryPending]
+		require.False(t, hasPending)
+	})
+
+	t.Run("re-enables retry after spec change", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Status.LastBuildRunRef = buildRunName
+		ib.Annotations = map[string]string{
+			buildv1alpha1.AnnotationKeyLastRetriedBuildRun: buildRunName,
+		}
+
+		r, c := newReconciler(t, ib)
+
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.NotNil(t, br)
+
+		latest := requireImageBuild(t, ctx, c, ib)
+		_, hasRetried := latest.Annotations[buildv1alpha1.AnnotationKeyLastRetriedBuildRun]
+		require.False(t, hasRetried)
+	})
+
+	t.Run("stops retrying after single failed retry", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Annotations = map[string]string{
+			buildv1alpha1.AnnotationKeyLastRetriedBuildRun: buildRunName,
+		}
+		r, _ := newRetryReconciler(t, ib)
+
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
+		require.NoError(t, err)
+		require.Nil(t, requeue)
+		require.NotNil(t, br)
+		require.Equal(t, buildRunName, br.Name)
 	})
 }
 
@@ -618,7 +718,7 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		unreferencedSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "unreferenced-secret",
-				Namespace: "default",
+				Namespace: defaultNamespace,
 			},
 		}
 		handler.Create(ctx, event.CreateEvent{Object: unreferencedSecret}, queue)
@@ -627,19 +727,17 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 	})
 
 	t.Run("reconciles ImageBuild when referenced secret appears", func(t *testing.T) {
-		const secretName = "push-secret"
-		const namespace = "ns"
 		const imageBuildName = "ib"
 
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: namespace,
+				Name:      pushSecretName,
+				Namespace: defaultNamespace,
 			},
 		}
 
-		ibPush := newImageBuild(imageBuildName, namespace)
-		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: secretName}
+		ibPush := newImageBuild(imageBuildName, defaultNamespace)
+		ibPush.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 
 		c := newClientWithSecretIndexes(t, secret, ibPush)
 		r := &Reconciler{Client: c, Scheme: newScheme(t)}
@@ -652,6 +750,6 @@ func TestMapSecretToImageBuilds(t *testing.T) {
 		require.Equal(t, 1, queue.Len())
 		req, _ := queue.Get()
 		queue.Done(req)
-		require.Equal(t, namespace+"/"+imageBuildName, req.String(), "expected ImageBuild to be enqueued")
+		require.Equal(t, defaultNamespace+"/"+imageBuildName, req.String(), "expected ImageBuild to be enqueued")
 	})
 }
