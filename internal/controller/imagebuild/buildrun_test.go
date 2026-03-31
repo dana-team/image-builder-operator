@@ -8,7 +8,6 @@ import (
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
-	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -202,81 +201,6 @@ func TestIsSpecDrifted(t *testing.T) {
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		ib.Spec.Rebuild = &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit}
-
-		require.False(t, r.isSpecDrifted(ctx, ib))
-	})
-
-	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
-		ib.Status.LastBuildRunRef = buildRunName
-
-		failedBuildRun := &shipwright.BuildRun{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      buildRunName,
-				Namespace: ib.Namespace,
-			},
-		}
-		failedBuildRun.Status.SetCondition(&shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionFalse,
-			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
-		})
-
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      pushSecretName,
-				Namespace: ib.Namespace,
-			},
-		}
-
-		r, _ := newReconciler(t, ib, failedBuildRun, secret)
-		require.NoError(t, r.recordBuildSpec(ib))
-
-		require.True(t, r.isSpecDrifted(ctx, ib))
-	})
-
-	t.Run("does not retry when secret is still missing", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
-		ib.Status.LastBuildRunRef = buildRunName
-
-		failedBuildRun := &shipwright.BuildRun{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      buildRunName,
-				Namespace: ib.Namespace,
-			},
-		}
-		failedBuildRun.Status.SetCondition(&shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionFalse,
-			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
-		})
-
-		r, _ := newReconciler(t, ib, failedBuildRun)
-		require.NoError(t, r.recordBuildSpec(ib))
-
-		require.False(t, r.isSpecDrifted(ctx, ib))
-	})
-
-	t.Run("does not retry for non-registration errors", func(t *testing.T) {
-		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = buildRunName
-
-		failedBuildRun := &shipwright.BuildRun{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      buildRunName,
-				Namespace: ib.Namespace,
-			},
-		}
-		failedBuildRun.Status.SetCondition(&shipwright.Condition{
-			Type:   shipwright.Succeeded,
-			Status: corev1.ConditionFalse,
-			Reason: "BuildRunTimeout",
-		})
-
-		r, _ := newReconciler(t, ib, failedBuildRun)
-		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.False(t, r.isSpecDrifted(ctx, ib))
 	})

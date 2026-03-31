@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -15,7 +14,6 @@ import (
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	distref "github.com/distribution/reference"
 	shipwright "github.com/shipwright-io/build/pkg/apis/build/v1beta1"
-	shipwrightresources "github.com/shipwright-io/build/pkg/reconciler/buildrun/resources"
 	"k8s.io/utils/ptr"
 )
 
@@ -114,20 +112,9 @@ func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageB
 		return true
 	}
 
-	if !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
+	return !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
 		!reflect.DeepEqual(ib.Spec.BuildFile, lastInputs.BuildFile) ||
-		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output) {
-		return true
-	}
-
-	if r.isSecretRetryNeeded(ctx, ib) {
-		logger.Info("Triggering automatic retry: referenced secret is now available",
-			"ImageBuild", ib.Name,
-			"LastBuildRun", ib.Status.LastBuildRunRef)
-		return true
-	}
-
-	return false
+		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output)
 }
 
 // recordBuildSpec snapshots the build-relevant spec fields
@@ -150,47 +137,6 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 
 	ib.Annotations[buildv1alpha1.AnnotationKeyLastBuildSpec] = string(specJSON)
 	return nil
-}
-
-// isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
-// secret that has since become available.
-func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
-	logger := log.FromContext(ctx)
-
-	lastBuildRun, err := r.getLastBuildRun(ctx, ib)
-	if err != nil || lastBuildRun == nil {
-		return false
-	}
-
-	succeededCond := lastBuildRun.Status.GetCondition(shipwright.Succeeded)
-	if succeededCond == nil || succeededCond.GetStatus() != corev1.ConditionFalse {
-		return false
-	}
-
-	if succeededCond.GetReason() != shipwrightresources.ConditionBuildRegistrationFailed {
-		return false
-	}
-
-	var secretNames []string
-	if ib.Spec.Output.PushSecret != nil {
-		secretNames = append(secretNames, ib.Spec.Output.PushSecret.Name)
-	}
-	if ib.Spec.Source.Git.CloneSecret != nil {
-		secretNames = append(secretNames, ib.Spec.Source.Git.CloneSecret.Name)
-	}
-
-	for _, name := range secretNames {
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, client.ObjectKey{
-			Namespace: ib.Namespace,
-			Name:      name,
-		}, secret); err == nil {
-			logger.Info("Secret is now available, will retry build", "Secret", name)
-			return true
-		}
-	}
-
-	return false
 }
 
 // computeLatestImage returns the image reference for a successful BuildRun,

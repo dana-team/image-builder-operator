@@ -17,10 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const (
-	absentStrategyName = "absent-strategy"
-	pushSecretName     = "push-secret"
-)
+const absentStrategyName = "absent-strategy"
 
 var errFake = errors.New("fake error")
 
@@ -113,38 +110,6 @@ func requireCondition(
 	require.NotNil(t, cond, "%s condition should be set", condType)
 	require.Equal(t, status, cond.Status)
 	require.Equal(t, reason, cond.Reason)
-}
-
-func newClientWithSecretIndexes(t *testing.T, objects ...client.Object) client.Client {
-	t.Helper()
-
-	scheme := newScheme(t)
-	return fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithStatusSubresource(&buildv1alpha1.ImageBuild{}).
-		WithIndex(&buildv1alpha1.ImageBuild{}, indexPushSecret, func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.Output.PushSecret != nil {
-				return []string{ib.Spec.Output.PushSecret.Name}
-			}
-			return nil
-		}).
-		WithIndex(&buildv1alpha1.ImageBuild{}, indexCloneSecret, func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.Source.Git.CloneSecret != nil {
-				return []string{ib.Spec.Source.Git.CloneSecret.Name}
-			}
-			return nil
-		}).
-		WithIndex(&buildv1alpha1.ImageBuild{}, indexWebhookSecret, func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.OnCommit != nil && ib.Spec.OnCommit.WebhookSecretRef.Name != "" {
-				return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
-			}
-			return nil
-		}).
-		WithObjects(objects...).
-		Build()
 }
 
 // buildCreateErrorClient injects errors when creating Build objects,
