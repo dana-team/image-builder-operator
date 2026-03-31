@@ -153,10 +153,8 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 }
 
 // isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
-// secret that has since become available.
+// secret and all referenced secrets are now available.
 func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
-	logger := log.FromContext(ctx)
-
 	lastBuildRun, err := r.getLastBuildRun(ctx, ib)
 	if err != nil || lastBuildRun == nil {
 		return false
@@ -179,18 +177,22 @@ func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.
 		secretNames = append(secretNames, ib.Spec.Source.Git.CloneSecret.Name)
 	}
 
+	if len(secretNames) == 0 {
+		return false
+	}
+
 	for _, name := range secretNames {
 		secret := &corev1.Secret{}
 		if err := r.Get(ctx, client.ObjectKey{
 			Namespace: ib.Namespace,
 			Name:      name,
-		}, secret); err == nil {
-			logger.Info("Secret is now available, will retry build", "Secret", name)
-			return true
+		}, secret); err != nil {
+			return false
 		}
 	}
 
-	return false
+	log.FromContext(ctx).Info("All referenced secrets are now available, will retry build")
+	return true
 }
 
 // computeLatestImage returns the image reference for a successful BuildRun,

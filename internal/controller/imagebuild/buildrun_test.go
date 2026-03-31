@@ -206,9 +206,10 @@ func TestIsSpecDrifted(t *testing.T) {
 		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
-	t.Run("retries when previously missing secret becomes available", func(t *testing.T) {
+	t.Run("retries when all previously missing secrets become available", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
+		ib.Spec.Source.Git.CloneSecret = &corev1.LocalObjectReference{Name: "clone-secret"}
 		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
@@ -223,17 +224,45 @@ func TestIsSpecDrifted(t *testing.T) {
 			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
 		})
 
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      pushSecretName,
-				Namespace: ib.Namespace,
-			},
+		pushSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: pushSecretName, Namespace: ib.Namespace},
+		}
+		cloneSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "clone-secret", Namespace: ib.Namespace},
 		}
 
-		r, _ := newReconciler(t, ib, failedBuildRun, secret)
+		r, _ := newReconciler(t, ib, failedBuildRun, pushSecret, cloneSecret)
 		require.NoError(t, r.recordBuildSpec(ib))
 
 		require.True(t, r.isSpecDrifted(ctx, ib))
+	})
+
+	t.Run("does not retry when only some secrets exist", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
+		ib.Spec.Source.Git.CloneSecret = &corev1.LocalObjectReference{Name: "clone-secret"}
+		ib.Status.LastBuildRunRef = buildRunName
+
+		failedBuildRun := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      buildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
+		})
+
+		pushSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: pushSecretName, Namespace: ib.Namespace},
+		}
+
+		r, _ := newReconciler(t, ib, failedBuildRun, pushSecret)
+		require.NoError(t, r.recordBuildSpec(ib))
+
+		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
 	t.Run("does not retry when secret is still missing", func(t *testing.T) {
