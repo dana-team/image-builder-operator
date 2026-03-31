@@ -94,8 +94,8 @@ func (r *Reconciler) ensureBuildRun(
 	return br, nil
 }
 
-// isSpecDrifted reports whether the observed state has drifted from the desired
-// state, indicating a new BuildRun should be created.
+// isSpecDrifted reports whether the build-relevant spec fields have changed
+// since the last recorded build.
 func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
 	logger := log.FromContext(ctx)
 
@@ -114,20 +114,9 @@ func (r *Reconciler) isSpecDrifted(ctx context.Context, ib *buildv1alpha1.ImageB
 		return true
 	}
 
-	if !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
+	return !reflect.DeepEqual(ib.Spec.Source, lastInputs.Source) ||
 		!reflect.DeepEqual(ib.Spec.BuildFile, lastInputs.BuildFile) ||
-		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output) {
-		return true
-	}
-
-	if r.isSecretRetryNeeded(ctx, ib) {
-		logger.Info("Triggering automatic retry: referenced secret is now available",
-			"ImageBuild", ib.Name,
-			"LastBuildRun", ib.Status.LastBuildRunRef)
-		return true
-	}
-
-	return false
+		!reflect.DeepEqual(ib.Spec.Output, lastInputs.Output)
 }
 
 // recordBuildSpec snapshots the build-relevant spec fields
@@ -155,6 +144,10 @@ func (r *Reconciler) recordBuildSpec(ib *buildv1alpha1.ImageBuild) error {
 // isSecretRetryNeeded reports whether the last BuildRun failed due to a missing
 // secret and all referenced secrets are now available.
 func (r *Reconciler) isSecretRetryNeeded(ctx context.Context, ib *buildv1alpha1.ImageBuild) bool {
+	if ib.Annotations[buildv1alpha1.AnnotationKeyRetryAttempted] != "" {
+		return false
+	}
+
 	lastBuildRun, err := r.getLastBuildRun(ctx, ib)
 	if err != nil || lastBuildRun == nil {
 		return false

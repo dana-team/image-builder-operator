@@ -206,7 +206,13 @@ func TestIsSpecDrifted(t *testing.T) {
 		require.False(t, r.isSpecDrifted(ctx, ib))
 	})
 
-	t.Run("retries when all previously missing secrets become available", func(t *testing.T) {
+}
+
+func TestIsSecretRetryNeeded(t *testing.T) {
+	ctx := context.Background()
+	const buildRunName = "some-buildrun"
+
+	t.Run("retries when all referenced secrets become available", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 		ib.Spec.Source.Git.CloneSecret = &corev1.LocalObjectReference{Name: "clone-secret"}
@@ -232,9 +238,8 @@ func TestIsSpecDrifted(t *testing.T) {
 		}
 
 		r, _ := newReconciler(t, ib, failedBuildRun, pushSecret, cloneSecret)
-		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.True(t, r.isSpecDrifted(ctx, ib))
+		require.True(t, r.isSecretRetryNeeded(ctx, ib))
 	})
 
 	t.Run("does not retry when only some secrets exist", func(t *testing.T) {
@@ -260,9 +265,8 @@ func TestIsSpecDrifted(t *testing.T) {
 		}
 
 		r, _ := newReconciler(t, ib, failedBuildRun, pushSecret)
-		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.False(t, r.isSpecDrifted(ctx, ib))
+		require.False(t, r.isSecretRetryNeeded(ctx, ib))
 	})
 
 	t.Run("does not retry when secret is still missing", func(t *testing.T) {
@@ -283,13 +287,13 @@ func TestIsSpecDrifted(t *testing.T) {
 		})
 
 		r, _ := newReconciler(t, ib, failedBuildRun)
-		require.NoError(t, r.recordBuildSpec(ib))
 
-		require.False(t, r.isSpecDrifted(ctx, ib))
+		require.False(t, r.isSecretRetryNeeded(ctx, ib))
 	})
 
 	t.Run("does not retry for non-registration errors", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
 		ib.Status.LastBuildRunRef = buildRunName
 
 		failedBuildRun := &shipwright.BuildRun{
@@ -304,9 +308,41 @@ func TestIsSpecDrifted(t *testing.T) {
 			Reason: "BuildRunTimeout",
 		})
 
-		r, _ := newReconciler(t, ib, failedBuildRun)
-		require.NoError(t, r.recordBuildSpec(ib))
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: pushSecretName, Namespace: ib.Namespace},
+		}
 
-		require.False(t, r.isSpecDrifted(ctx, ib))
+		r, _ := newReconciler(t, ib, failedBuildRun, secret)
+
+		require.False(t, r.isSecretRetryNeeded(ctx, ib))
+	})
+
+	t.Run("blocked after retry already attempted", func(t *testing.T) {
+		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
+		ib.Spec.Output.PushSecret = &corev1.LocalObjectReference{Name: pushSecretName}
+		ib.Status.LastBuildRunRef = buildRunName
+		ib.Annotations = map[string]string{
+			buildv1alpha1.AnnotationKeyRetryAttempted: "true",
+		}
+
+		failedBuildRun := &shipwright.BuildRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      buildRunName,
+				Namespace: ib.Namespace,
+			},
+		}
+		failedBuildRun.Status.SetCondition(&shipwright.Condition{
+			Type:   shipwright.Succeeded,
+			Status: corev1.ConditionFalse,
+			Reason: shipwrightresources.ConditionBuildRegistrationFailed,
+		})
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: pushSecretName, Namespace: ib.Namespace},
+		}
+
+		r, _ := newReconciler(t, ib, failedBuildRun, secret)
+
+		require.False(t, r.isSecretRetryNeeded(ctx, ib))
 	})
 }

@@ -541,8 +541,9 @@ func TestReconcileDefaultBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib, lastBuildRun)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileDefaultBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
+		require.Nil(t, requeue)
 		require.NotNil(t, br)
 		require.Equal(t, lastBuildRun.Name, br.Name)
 	})
@@ -554,8 +555,9 @@ func TestReconcileDefaultBuildRun(t *testing.T) {
 		r, _ := newReconciler(t, ib)
 		require.NoError(t, r.recordBuildSpec(ib))
 
-		br, err := r.reconcileDefaultBuildRun(ctx, ib)
+		br, requeue, err := r.reconcileDefaultBuildRun(ctx, ib)
 		require.NoError(t, err)
+		require.Nil(t, requeue)
 		require.Nil(t, br)
 	})
 }

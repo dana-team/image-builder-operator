@@ -38,6 +38,7 @@ const (
 
 	buildRunPollInterval = 10 * time.Second
 	errorRequeueInterval = 30 * time.Second
+	secretRetryInterval  = 60 * time.Second
 )
 
 var (
@@ -303,29 +304,59 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 	return nil
 }
 
-// reconcileDefaultBuildRun creates a new BuildRun when the spec has changed,
-// or returns the existing one otherwise.
+// reconcileDefaultBuildRun creates a new BuildRun when the spec has changed
+// or a secret retry is needed, and returns the existing one otherwise.
+// A non-nil duration signals the caller to requeue after the given delay.
 func (r *Reconciler) reconcileDefaultBuildRun(
 	ctx context.Context,
 	imageBuild *buildv1alpha1.ImageBuild,
-) (*shipwright.BuildRun, error) {
-	if r.isSpecDrifted(ctx, imageBuild) {
-		br, err := r.ensureBuildRun(ctx, imageBuild)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
-		}
+) (*shipwright.BuildRun, *time.Duration, error) {
+	logger := log.FromContext(ctx)
 
-		if err := r.recordBuildSpec(imageBuild); err != nil {
-			return nil, fmt.Errorf("failed to record build spec: %w", err)
-		}
-		if err := r.Update(ctx, imageBuild); err != nil {
-			return nil, fmt.Errorf("failed to update ImageBuild: %w", err)
-		}
+	specDrifted := r.isSpecDrifted(ctx, imageBuild)
+	secretRetry := !specDrifted && r.isSecretRetryNeeded(ctx, imageBuild)
 
-		return br, nil
+	if !specDrifted && !secretRetry {
+		br, err := r.getLastBuildRun(ctx, imageBuild)
+		return br, nil, err
 	}
 
-	return r.getLastBuildRun(ctx, imageBuild)
+	if secretRetry {
+		logger.Info("Triggering automatic retry: referenced secret is now available",
+			"ImageBuild", imageBuild.Name,
+			"LastBuildRun", imageBuild.Status.LastBuildRunRef)
+	}
+
+	br, err := r.ensureBuildRun(ctx, imageBuild)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", errBuildRunFailed, err)
+	}
+
+	// Manage retry guard after ensureBuildRun, which refreshes imageBuild
+	// from the API server via a status patch.
+	if secretRetry {
+		if imageBuild.Annotations == nil {
+			imageBuild.Annotations = make(map[string]string)
+		}
+		imageBuild.Annotations[buildv1alpha1.AnnotationKeyRetryAttempted] = "true"
+	} else {
+		delete(imageBuild.Annotations, buildv1alpha1.AnnotationKeyRetryAttempted)
+	}
+
+	if err := r.recordBuildSpec(imageBuild); err != nil {
+		return nil, nil, fmt.Errorf("failed to record build spec: %w", err)
+	}
+	if err := r.Update(ctx, imageBuild); err != nil {
+		return nil, nil, fmt.Errorf("failed to update ImageBuild: %w", err)
+	}
+
+	var requeue *time.Duration
+	if secretRetry {
+		delay := secretRetryInterval
+		requeue = &delay
+	}
+
+	return br, requeue, nil
 }
 
 // reconcileBuildRun reconciles the active or required BuildRun for the given ImageBuild.
@@ -342,7 +373,7 @@ func (r *Reconciler) reconcileBuildRun(
 		return buildRun, requeueAfter, nil
 	}
 
-	buildRun, err := r.reconcileDefaultBuildRun(ctx, ib)
+	buildRun, requeueAfter, err := r.reconcileDefaultBuildRun(ctx, ib)
 	if err != nil {
 		if !errors.Is(err, errBuildRunFailed) {
 			return nil, nil, err
@@ -356,7 +387,7 @@ func (r *Reconciler) reconcileBuildRun(
 		return nil, nil, err
 	}
 
-	return buildRun, nil, nil
+	return buildRun, requeueAfter, nil
 }
 
 func (r *Reconciler) validateWebhookSecret(ctx context.Context, ib *buildv1alpha1.ImageBuild) error {
