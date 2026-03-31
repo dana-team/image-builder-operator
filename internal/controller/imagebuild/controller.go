@@ -13,13 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,10 +26,6 @@ import (
 const (
 	controllerName = "ImageBuildController"
 	policyName     = "image-build-policy"
-
-	indexPushSecret    = "pushSecret"
-	indexCloneSecret   = "cloneSecret"
-	indexWebhookSecret = "webhookSecret"
 
 	buildRunPollInterval = 10 * time.Second
 	errorRequeueInterval = 30 * time.Second
@@ -66,98 +57,16 @@ type Reconciler struct {
 
 // SetupWithManager registers the controller and its watches with the given manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	ctx := context.Background()
-
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx, &buildv1alpha1.ImageBuild{}, indexPushSecret,
-		func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.Output.PushSecret != nil {
-				return []string{ib.Spec.Output.PushSecret.Name}
-			}
-			return nil
-		}); err != nil {
-		return fmt.Errorf("failed to index field %q: %w", indexPushSecret, err)
-	}
-
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx, &buildv1alpha1.ImageBuild{}, indexCloneSecret,
-		func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.Source.Git.CloneSecret != nil {
-				return []string{ib.Spec.Source.Git.CloneSecret.Name}
-			}
-			return nil
-		}); err != nil {
-		return fmt.Errorf("failed to index field %q: %w", indexCloneSecret, err)
-	}
-
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx, &buildv1alpha1.ImageBuild{}, indexWebhookSecret,
-		func(obj client.Object) []string {
-			ib := obj.(*buildv1alpha1.ImageBuild)
-			if ib.Spec.OnCommit != nil {
-				return []string{ib.Spec.OnCommit.WebhookSecretRef.Name}
-			}
-			return nil
-		}); err != nil {
-		return fmt.Errorf("failed to index field %q: %w", indexWebhookSecret, err)
-	}
-
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&buildv1alpha1.ImageBuild{}).
 		Owns(&shipwright.Build{}).
 		Owns(&shipwright.BuildRun{}).
-		Watches(&corev1.Secret{}, r.mapSecretToImageBuilds(), builder.WithPredicates(r.onCreatePredicate())).
 		Named(controllerName).
 		Complete(r); err != nil {
 		return fmt.Errorf("failed to build controller: %w", err)
 	}
 
 	return nil
-}
-
-// onCreatePredicate returns a predicate that only accepts create events.
-func (r *Reconciler) onCreatePredicate() predicate.Predicate {
-	return predicate.Funcs{
-		CreateFunc:  func(e event.CreateEvent) bool { return true },
-		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
-		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-	}
-}
-
-// mapSecretToImageBuilds returns an event handler that enqueues reconcile
-// requests for every ImageBuild referencing the Secret.
-func (r *Reconciler) mapSecretToImageBuilds() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		secret, ok := obj.(*corev1.Secret)
-		if !ok {
-			return nil
-		}
-
-		var requests []reconcile.Request
-
-		for _, indexKey := range []string{indexPushSecret, indexCloneSecret, indexWebhookSecret} {
-			imageBuilds := &buildv1alpha1.ImageBuildList{}
-			if err := r.List(ctx, imageBuilds,
-				client.InNamespace(secret.Namespace),
-				client.MatchingFields{indexKey: secret.Name},
-			); err != nil {
-				log.FromContext(ctx).Error(err, "Failed to list ImageBuilds by secret index",
-					"Secret", secret.Name, "Index", indexKey)
-				continue
-			}
-
-			for _, ib := range imageBuilds.Items {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: client.ObjectKeyFromObject(&ib),
-				})
-			}
-		}
-
-		return requests
-	})
 }
 
 // Reconcile reconciles the desired state of an ImageBuild with the cluster state.
