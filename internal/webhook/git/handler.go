@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,7 +34,7 @@ var (
 // Handler handles incoming Git webhook requests and triggers on-commit rebuilds for matching ImageBuilds.
 type Handler struct {
 	Client        client.Client
-	EventRecorder record.EventRecorder
+	EventRecorder events.EventRecorder
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +112,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if h.EventRecorder != nil {
-			h.EventRecorder.Eventf(&ib, corev1.EventTypeNormal, "WebhookAccepted",
+			h.EventRecorder.Eventf(&ib, nil, corev1.EventTypeNormal, "WebhookAccepted", "Accepted",
 				"git webhook accepted for %s/%s", ib.Namespace, ib.Name)
 		}
 	}

@@ -174,7 +174,7 @@ func main() {
 	if err := (&imagebuildcontroller.Reconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor("imagebuild-controller"),
+		EventRecorder: mgr.GetEventRecorder("imagebuild-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ImageBuild")
 		os.Exit(1)
@@ -184,7 +184,7 @@ func main() {
 		hookServer := mgr.GetWebhookServer()
 		hookServer.Register(gitwebhook.WebhookPath, &gitwebhook.Handler{
 			Client:        mgr.GetClient(),
-			EventRecorder: mgr.GetEventRecorderFor("git-webhook"),
+			EventRecorder: mgr.GetEventRecorder("git-webhook"),
 		})
 		setupLog.Info("git webhook handler registered", "path", gitwebhook.WebhookPath)
 	} else {
