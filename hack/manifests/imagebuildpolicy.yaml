@@ -7,3 +7,5 @@ spec:
     buildFile:
       present: "buildah-strategy-managed-push"
       absent: "buildpacks-v3"
+  retention:
+    succeededLimit: 10

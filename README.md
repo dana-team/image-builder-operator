@@ -61,6 +61,8 @@ spec:
     buildFile:
       present: buildah-strategy-managed-push
       absent: buildpacks-v3
+  retention:
+    succeededLimit: 10
 EOF
 ```
 
@@ -98,6 +100,8 @@ spec:
     image: docker.io/myorg/my-app:latest
     pushSecret:
       name: registry-credentials
+  retention:
+    failedLimit: 5
 ```
 
 ### Automatic rebuilds on commit

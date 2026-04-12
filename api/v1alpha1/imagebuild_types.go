@@ -71,6 +71,10 @@ type ImageBuildSpec struct {
 	// +optional
 	// OnCommit configures webhook-triggered rebuilds.
 	OnCommit *ImageBuildOnCommit `json:"onCommit,omitempty"`
+
+	// +optional
+	// Retention configures completed-build retention.
+	Retention *Retention `json:"retention,omitempty"`
 }
 
 // ImageBuildSource describes the source code location for an ImageBuild.

@@ -24,6 +24,10 @@ import (
 type ImageBuildPolicySpec struct {
 	// ClusterBuildStrategy holds platform defaults for selecting a build strategy.
 	ClusterBuildStrategy ImageBuildClusterStrategy `json:"clusterBuildStrategy"`
+
+	// +optional
+	// Retention configures cluster-wide completed-build retention.
+	Retention *Retention `json:"retention,omitempty"`
 }
 
 // ImageBuildClusterStrategy holds platform defaults for selecting a ClusterBuildStrategy.

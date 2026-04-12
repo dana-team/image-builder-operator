@@ -67,6 +67,34 @@ spec:
                 required:
                 - buildFile
                 type: object
+              retention:
+                description: Retention configures cluster-wide completed-build retention.
+                properties:
+                  failedLimit:
+                    description: FailedLimit defines the maximum number of failed
+                      buildruns that should exist.
+                    format: int32
+                    maximum: 10000
+                    minimum: 1
+                    type: integer
+                  succeededLimit:
+                    description: SucceededLimit defines the maximum number of succeeded
+                      buildruns that should exist.
+                    format: int32
+                    maximum: 10000
+                    minimum: 1
+                    type: integer
+                  ttlAfterFailed:
+                    description: TTLAfterFailed defines the maximum duration of time
+                      the failed buildrun should exist.
+                    format: duration
+                    type: string
+                  ttlAfterSucceeded:
+                    description: TTLAfterSucceeded defines the maximum duration of
+                      time the succeeded buildrun should exist.
+                    format: duration
+                    type: string
+                type: object
             required:
             - clusterBuildStrategy
             type: object
