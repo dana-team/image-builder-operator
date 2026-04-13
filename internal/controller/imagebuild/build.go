@@ -18,6 +18,7 @@ import (
 func (r *Reconciler) ensureBuild(
 	ctx context.Context,
 	ib *buildv1alpha1.ImageBuild,
+	policy *buildv1alpha1.ImageBuildPolicy,
 	strategyName string,
 ) error {
 	logger := log.FromContext(ctx)
@@ -27,7 +28,7 @@ func (r *Reconciler) ensureBuild(
 		return fmt.Errorf("failed to get ClusterBuildStrategy %q: %w", strategyName, err)
 	}
 
-	desired := r.newBuild(ib, strategyName)
+	desired := r.newBuild(ib, policy, strategyName)
 
 	actual := &shipwright.Build{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,6 +62,7 @@ func (r *Reconciler) ensureBuild(
 
 func (r *Reconciler) newBuild(
 	ib *buildv1alpha1.ImageBuild,
+	policy *buildv1alpha1.ImageBuildPolicy,
 	strategyName string,
 ) *shipwright.Build {
 	build := &shipwright.Build{
@@ -100,6 +102,8 @@ func (r *Reconciler) newBuild(
 	if ib.Spec.Output.PushSecret != nil && ib.Spec.Output.PushSecret.Name != "" {
 		build.Spec.Output.PushSecret = ptr.To(ib.Spec.Output.PushSecret.Name)
 	}
+
+	build.Spec.Retention = newBuildRetention(resolveRetention(ib, policy))
 
 	return build
 }

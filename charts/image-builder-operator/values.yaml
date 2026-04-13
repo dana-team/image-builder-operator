@@ -31,6 +31,11 @@ imageBuildPolicy:
       # -- Strategy name when the source does not indicate a file-based build.
       absent: buildpacks-v3
 
+  # -- Default completed-build retention on the ImageBuildPolicy (spec.retention). Set to null to omit.
+  retention:
+    succeededLimit: 10
+    failedLimit: 5
+
 onCommit:
   # -- Enable OnCommit webhook triggers and associated service.
   enabled: false

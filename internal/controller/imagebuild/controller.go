@@ -186,7 +186,7 @@ func (r *Reconciler) reconcileBuild(ctx context.Context, imageBuild *buildv1alph
 		selectedStrategyName = present
 	}
 
-	if err := r.ensureBuild(ctx, imageBuild, selectedStrategyName); err != nil {
+	if err := r.ensureBuild(ctx, imageBuild, policy, selectedStrategyName); err != nil {
 		var (
 			reason       = ReasonBuildReconcileFailed
 			alreadyOwned *controllerutil.AlreadyOwnedError

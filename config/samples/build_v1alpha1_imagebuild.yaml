@@ -23,6 +23,9 @@ spec:
     pushSecret:
       name: registry-credentials
 
+  retention:
+    succeededLimit: 10
+
   onCommit:
     webhookSecretRef:
       name: webhook-secret

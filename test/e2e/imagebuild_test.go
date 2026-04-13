@@ -17,6 +17,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -50,6 +51,9 @@ func newImageBuild(namespace, revision string) *buildv1alpha1.ImageBuild {
 			},
 			Output: buildv1alpha1.ImageBuildOutput{
 				Image: "registry.example.com/team/imagebuild-e2e:v1",
+			},
+			Retention: &buildv1alpha1.Retention{
+				SucceededLimit: ptr.To(int32(10)),
 			},
 		},
 	}
@@ -189,6 +193,9 @@ func waitForBuild(
 		b := &shipwright.Build{}
 		g.Expect(c.Get(ctx, types.NamespacedName{Name: buildName, Namespace: namespace}, b)).To(Succeed())
 		g.Expect(metav1.IsControlledBy(b, imageBuild)).To(BeTrue())
+		g.Expect(b.Spec.Retention).NotTo(BeNil())
+		g.Expect(b.Spec.Retention.SucceededLimit).NotTo(BeNil())
+		g.Expect(*b.Spec.Retention.SucceededLimit).To(Equal(uint(10)))
 		build = b
 	}, timeout, interval).Should(Succeed())
 	return build
