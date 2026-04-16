@@ -6,8 +6,8 @@ metadata:
   {{- include "image-builder-operator.labels" . | nindent 4 }}
 spec:
   dnsNames:
-  - '{{ include "image-builder-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc'
-  - '{{ include "image-builder-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local'
+  - '{{ include "image-builder-operator.fullname" . }}-git-webhook-service.{{ .Release.Namespace }}.svc'
+  - '{{ include "image-builder-operator.fullname" . }}-git-webhook-service.{{ .Release.Namespace }}.svc.cluster.local'
   issuerRef:
     kind: Issuer
     name: '{{ include "image-builder-operator.fullname" . }}-selfsigned-issuer'
