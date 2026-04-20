@@ -157,14 +157,26 @@ func TestServeHTTP(t *testing.T) {
 			secret:  []byte("s3cr3t"),
 			buildReq: func(secret []byte) *http.Request {
 				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://github.com/org/repo"}}`)
-				mac := hmac.New(sha256.New, secret)
-				mac.Write(body)
-				sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-
-				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewReader(body))
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set(github.EventTypeHeader, "push")
-				req.Header.Set(github.SHA256SignatureHeader, sig)
+				return newGitHubPushRequest(body, secret)
+			},
+		},
+		{
+			name:    "GitHub push records pending commit when source uses SSH clone URL",
+			repoURL: "git@github.com:Org/Repo.git",
+			secret:  []byte("s3cr3t"),
+			buildReq: func(secret []byte) *http.Request {
+				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"https://github.com/org/repo.git","html_url":"https://github.com/org/repo"}}`)
+				return newGitHubPushRequest(body, secret)
+			},
+		},
+		{
+			name:    "GitLab push records pending commit when source uses SSH clone URL",
+			repoURL: "git@gitlab.example:group/repo.git",
+			secret:  []byte("token"),
+			buildReq: func(secret []byte) *http.Request {
+				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+				req.Header.Set(gitlabEventHeader, gitlabPushHook)
+				req.Header.Set(gitlabAuthHeader, string(secret))
 				return req
 			},
 		},
@@ -188,6 +200,28 @@ func TestServeHTTP(t *testing.T) {
 			require.Equal(t, "abc", updated.Status.OnCommit.Pending.CommitSHA)
 		})
 	}
+}
+
+func TestRepoIdentity(t *testing.T) {
+	t.Run("repo identity matches normalized URL when remote does not parse as vcs", func(t *testing.T) {
+		remoteURL := "foo"
+		require.Equal(t, normalizeRepoURL(remoteURL), repoIdentity(remoteURL))
+	})
+}
+
+func newGitHubPushRequest(body, secret []byte) *http.Request {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write(body)
+	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(github.EventTypeHeader, "push")
+	req.Header.Set(github.SHA256SignatureHeader, sig)
+	return req
+}
+
+func gitlabPushPayload(repoURL string) string {
+	return fmt.Sprintf(`{"ref":"%s","after":"abc","project":{"git_http_url":"%s"}}`, refHeadsMain, repoURL)
 }
 
 func newClient(t *testing.T, objs ...client.Object) client.Client {
@@ -223,10 +257,6 @@ func newOnCommitImageBuild(url string) *buildv1alpha1.ImageBuild {
 			Rebuild:   &buildv1alpha1.ImageBuildRebuild{Mode: buildv1alpha1.ImageBuildRebuildModeOnCommit},
 		},
 	}
-}
-
-func gitlabPushPayload(repoURL string) string {
-	return fmt.Sprintf(`{"ref":"%s","after":"abc","project":{"git_http_url":"%s"}}`, refHeadsMain, repoURL)
 }
 
 type listErrorClient struct {

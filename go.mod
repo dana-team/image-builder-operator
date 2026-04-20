@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/distribution/reference v0.6.0
+	github.com/gitsight/go-vcsurl v1.0.1
 	github.com/go-playground/webhooks/v6 v6.4.0
 	github.com/google/go-github/v69 v69.2.0
 	github.com/onsi/ginkgo/v2 v2.28.1

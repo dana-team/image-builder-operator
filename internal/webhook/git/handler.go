@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	buildv1alpha1 "github.com/dana-team/image-builder-operator/api/v1alpha1"
+	"github.com/gitsight/go-vcsurl"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,7 +66,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	normalizedRepoURL := normalizeRepoURL(event.RepoURL)
+	eventRepoIdentity := repoIdentity(event.RepoURL)
 	matches := make([]buildv1alpha1.ImageBuild, 0, len(list.Items))
 	for _, ib := range list.Items {
 
@@ -74,7 +75,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ib.Spec.Source.Type == buildv1alpha1.ImageBuildSourceTypeGit &&
 			ib.Spec.Source.Git.URL != "" &&
 			ib.Spec.Source.Git.Revision != "" &&
-			normalizeRepoURL(ib.Spec.Source.Git.URL) == normalizedRepoURL &&
+			repoIdentity(ib.Spec.Source.Git.URL) == eventRepoIdentity &&
 			event.Ref == "refs/heads/"+ib.Spec.Source.Git.Revision
 
 		if !isMatch {
@@ -209,4 +210,18 @@ func normalizeRepoURL(s string) string {
 	s = strings.TrimRight(s, "/")
 	s = strings.TrimSuffix(s, ".git")
 	return s
+}
+
+// repoIdentity returns a string derived from a Git remote URL. Two inputs refer to the
+// same repository when their returned strings are equal.
+func repoIdentity(remoteURL string) string {
+	s := strings.TrimSpace(remoteURL)
+	if s == "" {
+		return ""
+	}
+	info, err := vcsurl.Parse(s)
+	if err != nil || info.ID == "" {
+		return normalizeRepoURL(remoteURL)
+	}
+	return strings.ToLower(info.ID)
 }
