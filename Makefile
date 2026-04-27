@@ -210,6 +210,7 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GINKGO ?= $(LOCALBIN)/ginkgo
+HELM_DOCS ?= $(LOCALBIN)/helm-docs
 
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
@@ -217,6 +218,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 ENVTEST_K8S_VERSION = 1.31.0
 GOLANGCI_LINT_VERSION ?= v2.7.2
 GINKGO_VERSION ?= $(shell go list -m -f "{{ .Version }}" github.com/onsi/ginkgo/v2)
+HELM_DOCS_VERSION ?= v1.14.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE)
@@ -250,6 +252,21 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 ginkgo: $(GINKGO)
 $(GINKGO): $(LOCALBIN)
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
+
+$(HELM_DOCS): $(LOCALBIN)
+	$(call go-install-tool,$(HELM_DOCS),github.com/norwoodj/helm-docs/cmd/helm-docs,$(HELM_DOCS_VERSION))
+
+.PHONY: helm-docs
+helm-docs: $(HELM_DOCS) ## Regenerate Helm chart README from values.yaml.
+	$(HELM_DOCS) --chart-search-root=charts
+
+.PHONY: verify-helm-docs
+verify-helm-docs: helm-docs ## Verify Helm chart README is in sync with values.yaml.
+	@if ! git diff --exit-code charts/image-builder-operator/README.md; then \
+		echo "ERROR: Helm chart README is out of sync with values.yaml."; \
+		echo "Run 'make helm-docs' and commit the changes."; \
+		exit 1; \
+	fi
 
 define go-install-tool
 @[ -f "$(1)-$(3)" ] || { \
