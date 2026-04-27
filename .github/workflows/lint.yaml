@@ -51,3 +51,6 @@ jobs:
             echo "Run 'make sync-helm-crds' and commit the changes."
             exit 1
           fi
+
+      - name: Verify Helm chart README is in sync
+        run: make verify-helm-docs
