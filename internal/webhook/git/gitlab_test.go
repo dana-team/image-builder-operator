@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,12 +14,14 @@ func TestGitLabReadPushEvent(t *testing.T) {
 	p := &gitlabProvider{}
 
 	t.Run("parses valid push payload", func(t *testing.T) {
-		body := []byte(gitlabPushPayload(gitlabRepoURL))
+		ssh := "git@gitlab.example:group/repo.git"
+		body := []byte(fmt.Sprintf(`{"ref":%q,"after":"abc","project":{"git_http_url":%q,"git_ssh_url":%q}}`,
+			refHeadsMain, gitlabRepoURL, ssh))
 		event, err := p.ReadPushEvent(body)
 		require.NoError(t, err)
-		require.Equal(t, gitlabRepoURL, event.RepoURL)
-		require.Equal(t, refHeadsMain, event.Ref)
-		require.Equal(t, "abc", event.CommitSHA)
+		require.ElementsMatch(t, []string{ssh, gitlabRepoURL}, event.cloneURLs)
+		require.Equal(t, refHeadsMain, event.ref)
+		require.Equal(t, "abc", event.commitSHA)
 	})
 
 	t.Run("rejects malformed JSON", func(t *testing.T) {

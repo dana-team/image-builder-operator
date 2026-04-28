@@ -156,7 +156,7 @@ func TestServeHTTP(t *testing.T) {
 			repoURL: githubRepoURL,
 			secret:  []byte("s3cr3t"),
 			buildReq: func(secret []byte) *http.Request {
-				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://github.com/org/repo"}}`)
+				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"https://github.com/org/repo.git"}}`)
 				return newGitHubPushRequest(body, secret)
 			},
 		},
@@ -165,7 +165,7 @@ func TestServeHTTP(t *testing.T) {
 			repoURL: "git@github.com:Org/Repo.git",
 			secret:  []byte("s3cr3t"),
 			buildReq: func(secret []byte) *http.Request {
-				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"https://github.com/org/repo.git","html_url":"https://github.com/org/repo"}}`)
+				body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"https://github.com/org/repo.git"}}`)
 				return newGitHubPushRequest(body, secret)
 			},
 		},

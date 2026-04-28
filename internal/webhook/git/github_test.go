@@ -19,19 +19,12 @@ func TestGitHubReadPushEvent(t *testing.T) {
 	p := &githubProvider{}
 
 	t.Run("parses valid push payload", func(t *testing.T) {
-		body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc123","repository":{"clone_url":"` + githubCloneURL + `","html_url":"` + githubRepoURL + `"}}`)
+		body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc123","repository":{"clone_url":"` + githubCloneURL + `"}}`)
 		event, err := p.ReadPushEvent(body)
 		require.NoError(t, err)
-		require.Equal(t, githubCloneURL, event.RepoURL)
-		require.Equal(t, refHeadsMain, event.Ref)
-		require.Equal(t, "abc123", event.CommitSHA)
-	})
-
-	t.Run("falls back to HTML URL when clone URL is empty", func(t *testing.T) {
-		body := []byte(`{"ref":"` + refHeadsMain + `","after":"abc","repository":{"clone_url":"","html_url":"` + githubRepoURL + `"}}`)
-		event, err := p.ReadPushEvent(body)
-		require.NoError(t, err)
-		require.Equal(t, githubRepoURL, event.RepoURL)
+		require.Equal(t, []string{githubCloneURL}, event.cloneURLs)
+		require.Equal(t, refHeadsMain, event.ref)
+		require.Equal(t, "abc123", event.commitSHA)
 	})
 
 	t.Run("rejects malformed JSON", func(t *testing.T) {
