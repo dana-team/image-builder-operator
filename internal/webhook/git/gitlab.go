@@ -33,7 +33,8 @@ func (p *gitlabProvider) ReadPushEvent(body []byte) (*pushEvent, error) {
 		return nil, fmt.Errorf("failed to parse GitLab push event: %w", err)
 	}
 
-	return newPushEvent(payload.Project.GitHTTPURL, payload.Project.WebURL, payload.Ref, payload.After)
+	cloneURLs := appendTrimmedNonEmpty(payload.Project.GitSSHURL, payload.Project.GitHTTPURL)
+	return newPushEvent(cloneURLs, payload.Ref, payload.After)
 }
 
 // Authenticate validates the GitLab webhook token against the shared secret.

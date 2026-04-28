@@ -5,9 +5,9 @@ import (
 )
 
 type pushEvent struct {
-	RepoURL   string
-	Ref       string
-	CommitSHA string
+	cloneURLs []string
+	ref       string
+	commitSHA string
 }
 
 type webhookProvider interface {

@@ -29,7 +29,7 @@ var (
 	errUnsupportedWebhook      = errors.New("unsupported webhook event: only GitHub and GitLab push events are supported")
 	errMissingOnCommit         = errors.New("missing spec.onCommit")
 	errMissingWebhookSecretKey = errors.New("missing key in webhook secret")
-	errMissingPushEventFields  = errors.New("missing required fields: ref or repository URL")
+	errMissingPushEventFields  = errors.New("missing required fields: ref or non-empty clone URLs")
 )
 
 // Handler handles incoming Git webhook requests and triggers on-commit rebuilds for matching ImageBuilds.
@@ -66,26 +66,37 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventRepoIdentity := repoIdentity(event.RepoURL)
+	eventRepoIdentities := make([]string, len(event.cloneURLs))
+	for i, cloneURL := range event.cloneURLs {
+		eventRepoIdentities[i] = repoIdentity(cloneURL)
+	}
+
 	matches := make([]buildv1alpha1.ImageBuild, 0, len(list.Items))
 	for _, ib := range list.Items {
-
-		isMatch := ib.Spec.Rebuild != nil &&
-			ib.Spec.Rebuild.Mode == buildv1alpha1.ImageBuildRebuildModeOnCommit &&
-			ib.Spec.Source.Type == buildv1alpha1.ImageBuildSourceTypeGit &&
-			ib.Spec.Source.Git.URL != "" &&
-			ib.Spec.Source.Git.Revision != "" &&
-			repoIdentity(ib.Spec.Source.Git.URL) == eventRepoIdentity &&
-			event.Ref == "refs/heads/"+ib.Spec.Source.Git.Revision
-
-		if !isMatch {
+		if ib.Spec.Rebuild == nil ||
+			ib.Spec.Rebuild.Mode != buildv1alpha1.ImageBuildRebuildModeOnCommit ||
+			ib.Spec.Source.Type != buildv1alpha1.ImageBuildSourceTypeGit ||
+			ib.Spec.Source.Git.URL == "" ||
+			ib.Spec.Source.Git.Revision == "" ||
+			event.ref != "refs/heads/"+ib.Spec.Source.Git.Revision {
+			continue
+		}
+		specID := repoIdentity(ib.Spec.Source.Git.URL)
+		matched := false
+		for _, id := range eventRepoIdentities {
+			if specID == id {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			continue
 		}
 		matches = append(matches, ib)
 	}
 
 	if len(matches) == 0 {
-		logger.Info("webhook ignored: no matching ImageBuild found", "repo", event.RepoURL, "ref", event.Ref)
+		logger.Info("webhook ignored: no matching ImageBuild found", "repo", event.cloneURLs[0], "ref", event.ref)
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -158,8 +169,8 @@ func (h *Handler) patchOnCommitStatus(
 			latest.Status.OnCommit = &buildv1alpha1.ImageBuildOnCommitStatus{}
 		}
 		onCommitEvent := &buildv1alpha1.ImageBuildOnCommitEvent{
-			Ref:        event.Ref,
-			CommitSHA:  event.CommitSHA,
+			Ref:        event.ref,
+			CommitSHA:  event.commitSHA,
 			ReceivedAt: now,
 		}
 		latest.Status.OnCommit.LastReceived = onCommitEvent
@@ -192,26 +203,6 @@ func getWebhookSecret(ctx context.Context, c client.Client, ib *buildv1alpha1.Im
 	return val, nil
 }
 
-// newPushEvent constructs a pushEvent with URL fallback and field validation.
-func newPushEvent(primaryURL, fallbackURL, ref, commitSHA string) (*pushEvent, error) {
-	repo := strings.TrimSpace(primaryURL)
-	if repo == "" {
-		repo = strings.TrimSpace(fallbackURL)
-	}
-	if repo == "" || strings.TrimSpace(ref) == "" {
-		return nil, errMissingPushEventFields
-	}
-	return &pushEvent{RepoURL: repo, Ref: ref, CommitSHA: commitSHA}, nil
-}
-
-func normalizeRepoURL(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.ToLower(s)
-	s = strings.TrimRight(s, "/")
-	s = strings.TrimSuffix(s, ".git")
-	return s
-}
-
 // repoIdentity returns a string derived from a Git remote URL. Two inputs refer to the
 // same repository when their returned strings are equal.
 func repoIdentity(remoteURL string) string {
@@ -224,4 +215,29 @@ func repoIdentity(remoteURL string) string {
 		return normalizeRepoURL(remoteURL)
 	}
 	return strings.ToLower(info.ID)
+}
+
+func normalizeRepoURL(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ToLower(s)
+	s = strings.TrimRight(s, "/")
+	s = strings.TrimSuffix(s, ".git")
+	return s
+}
+
+func newPushEvent(cloneURLs []string, ref, commitSHA string) (*pushEvent, error) {
+	if strings.TrimSpace(ref) == "" || len(cloneURLs) == 0 {
+		return nil, errMissingPushEventFields
+	}
+	return &pushEvent{cloneURLs: cloneURLs, ref: ref, commitSHA: commitSHA}, nil
+}
+
+func appendTrimmedNonEmpty(elems ...string) []string {
+	var out []string
+	for _, s := range elems {
+		if trimmed := strings.TrimSpace(s); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
