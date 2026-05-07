@@ -42,7 +42,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/none.git")))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/none.git")))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString("{"))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString("{"))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
@@ -68,7 +68,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: &listErrorClient{Client: c, err: errFake}}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/repo.git")))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload("https://example.com/repo.git")))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestServeHTTP(t *testing.T) {
 		)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, "wrong")
 		rr := httptest.NewRecorder()
@@ -102,7 +102,7 @@ func TestServeHTTP(t *testing.T) {
 		)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, fakeToken)
 		rr := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestServeHTTP(t *testing.T) {
 		c := newClient(t)
 		h := &Handler{Client: c}
 
-		req := httptest.NewRequest(http.MethodGet, WebhookPath, nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, WebhookPath, nil)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -127,7 +127,7 @@ func TestServeHTTP(t *testing.T) {
 		h := &Handler{Client: c}
 
 		body := `{"ref":"` + refHeadsMain + `","after":"abc","repository":{"html_url":"https://example.com/repo"}}`
-		req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(body))
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req.WithContext(context.Background()))
@@ -145,7 +145,7 @@ func TestServeHTTP(t *testing.T) {
 			repoURL: gitlabRepoURL,
 			secret:  []byte("token"),
 			buildReq: func(secret []byte) *http.Request {
-				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+				req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
 				req.Header.Set(gitlabEventHeader, gitlabPushHook)
 				req.Header.Set(gitlabAuthHeader, string(secret))
 				return req
@@ -174,7 +174,7 @@ func TestServeHTTP(t *testing.T) {
 			repoURL: "git@gitlab.example:group/repo.git",
 			secret:  []byte("token"),
 			buildReq: func(secret []byte) *http.Request {
-				req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
+				req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewBufferString(gitlabPushPayload(gitlabRepoURL)))
 				req.Header.Set(gitlabEventHeader, gitlabPushHook)
 				req.Header.Set(gitlabAuthHeader, string(secret))
 				return req
@@ -213,7 +213,7 @@ func newGitHubPushRequest(body, secret []byte) *http.Request {
 	mac := hmac.New(sha256.New, secret)
 	mac.Write(body)
 	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-	req := httptest.NewRequest(http.MethodPost, WebhookPath, bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, WebhookPath, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(github.EventTypeHeader, "push")
 	req.Header.Set(github.SHA256SignatureHeader, sig)

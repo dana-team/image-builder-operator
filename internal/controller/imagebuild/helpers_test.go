@@ -17,7 +17,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const absentStrategyName = "absent-strategy"
+const (
+	absentStrategyName   = "absent-strategy"
+	outputImageRepo      = "registry.example.com/team/app"
+	existingBuildRunName = "existing-br"
+)
 
 var errFake = errors.New("fake error")
 
@@ -92,7 +96,7 @@ func newImageBuild(name, namespace string) *buildv1alpha1.ImageBuild {
 				Type: buildv1alpha1.ImageBuildSourceTypeGit,
 				Git:  buildv1alpha1.ImageBuildGitSource{URL: "https://example.invalid/repo.git"},
 			},
-			Output: buildv1alpha1.ImageBuildOutput{Image: "registry.example.com/team/app"},
+			Output: buildv1alpha1.ImageBuildOutput{Image: outputImageRepo},
 		},
 	}
 }
