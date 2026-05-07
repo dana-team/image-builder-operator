@@ -409,13 +409,13 @@ func TestReconcile(t *testing.T) {
 			ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
 			ib.Status.BuildRef = buildNameFor(ib)
 			ib.Status.ObservedGeneration = ib.Generation
-			ib.Status.LastBuildRunRef = "existing-br"
+			ib.Status.LastBuildRunRef = existingBuildRunName
 			require.NoError(t, (&Reconciler{}).recordBuildSpec(ib))
 
 			strategy := newClusterBuildStrategy(absentStrategyName)
 			existingBuildRun := &shipwright.BuildRun{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "existing-br",
+					Name:      existingBuildRunName,
 					Namespace: ib.Namespace,
 				},
 			}
@@ -526,11 +526,11 @@ func TestReconcileDefaultBuildRun(t *testing.T) {
 
 	t.Run("reuses last BuildRun when spec unchanged", func(t *testing.T) {
 		ib := newImageBuild("ib-"+t.Name(), "ns-"+t.Name())
-		ib.Status.LastBuildRunRef = "existing-br"
+		ib.Status.LastBuildRunRef = existingBuildRunName
 
 		lastBuildRun := &shipwright.BuildRun{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "existing-br",
+				Name:      existingBuildRunName,
 				Namespace: ib.Namespace,
 			},
 		}

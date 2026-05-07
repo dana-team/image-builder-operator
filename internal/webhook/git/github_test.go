@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -43,7 +44,7 @@ func TestGitHubAuthenticate(t *testing.T) {
 		mac.Write(body)
 		sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
-		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set(github.EventTypeHeader, "push")
 		req.Header.Set(github.SHA256SignatureHeader, sig)
@@ -52,7 +53,7 @@ func TestGitHubAuthenticate(t *testing.T) {
 	})
 
 	t.Run("rejects invalid HMAC signature", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set(github.EventTypeHeader, "push")
 		req.Header.Set(github.SHA256SignatureHeader, "sha256=invalid")
