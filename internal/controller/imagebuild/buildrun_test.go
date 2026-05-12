@@ -98,7 +98,7 @@ func TestComputeLatestImage(t *testing.T) {
 
 	t.Run("returns empty when image has no tag or digest", func(t *testing.T) {
 		ibCopy := ib.DeepCopy()
-		ibCopy.Spec.Output.Image = "registry.example.com/team/app"
+		ibCopy.Spec.Output.Image = outputImageRepo
 		br := &shipwright.BuildRun{}
 		require.Empty(t, computeLatestImage(ibCopy, br))
 	})

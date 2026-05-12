@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +37,7 @@ func TestGitLabAuthenticate(t *testing.T) {
 	body := []byte(gitlabPushPayload(gitlabRepoURL))
 
 	t.Run("succeeds with valid token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", bytes.NewReader(body))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, string(secret))
 
@@ -44,7 +45,7 @@ func TestGitLabAuthenticate(t *testing.T) {
 	})
 
 	t.Run("rejects invalid token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", bytes.NewReader(body))
 		req.Header.Set(gitlabEventHeader, gitlabPushHook)
 		req.Header.Set(gitlabAuthHeader, "wrong")
 
