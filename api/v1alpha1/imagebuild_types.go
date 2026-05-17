@@ -239,7 +239,3 @@ type ImageBuildList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ImageBuild `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ImageBuild{}, &ImageBuildList{})
-}

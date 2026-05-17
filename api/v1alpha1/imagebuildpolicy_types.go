@@ -69,7 +69,3 @@ type ImageBuildPolicyList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ImageBuildPolicy `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ImageBuildPolicy{}, &ImageBuildPolicyList{})
-}
