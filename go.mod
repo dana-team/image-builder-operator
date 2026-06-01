@@ -7,8 +7,8 @@ require (
 	github.com/gitsight/go-vcsurl v1.0.1
 	github.com/go-playground/webhooks/v6 v6.4.0
 	github.com/google/go-github/v69 v69.2.0
-	github.com/onsi/ginkgo/v2 v2.28.3
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/gomega v1.41.0
 	github.com/shipwright-io/build v0.19.4
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.36.1
